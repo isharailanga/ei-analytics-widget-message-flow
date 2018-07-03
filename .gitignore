@@ -1,0 +1,5 @@
+# Modules for node
+node_modules
+
+# Build data
+dist
