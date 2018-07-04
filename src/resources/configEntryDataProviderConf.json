@@ -1,0 +1,12 @@
+{
+  "configs": {
+    "type": "SiddhiStoreDataProvider",
+    "config": {
+      "siddhiApp": "@App:name(\"ESBConfigEntry\") @store(type = 'rdbms', datasource = 'EI_ANALYTICS') define table testSort (meta_tenantId int, hashcode int, entryName string, configData string, timestamp int);",
+      "queryData":{
+        "query": "from {{configEntryTable}} on {{componentId}} == entryName AND  {{meta_tenantId}} == meta_tenantId select meta_tenantId, hashcode, entryName, configData, timestamp having timestamp > {{timeFrom}} AND timestamp < {{timeTo}} order by timestamp desc limit 1"
+      },
+      "publishingInterval": 60
+    }
+  }
+}

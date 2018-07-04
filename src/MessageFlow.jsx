@@ -4,8 +4,34 @@ import $ from 'jquery';
 import dagreD3 from 'dagre-d3';
 import * as d3 from 'd3';
 import './custom.css';
-import './font-awesome.css';
+import aggregatorDataProviderConf from './resources/aggregatorDataProviderConf.json';
+import configEntryDataProviderConf from './resources/configEntryDataProviderConf.json';
 import nanoScroller from 'nanoscroller/bin/javascripts/jquery.nanoscroller';
+
+var TYPE_MEDIATOR = 'mediator';
+var TYPE_SEQUENCE = 'sequences';
+var TYPE_ENDPOINT = 'endpoint';
+var DASHBOARD_NAME = 'eianalytics';
+var TYPE_PROXY = "proxy";
+var TYPE_API = "api";
+var TYPE_INBOUND_ENDPOINT = "inbound";
+var TYPE_MESSAGE = "message";
+var TENANT_ID = "-1234";
+var CONFIG_ENTRY_TABLE = "configEntry";
+var TABLE_DATA_UNAVAILABLE = "table data unavailable";
+
+var BASE_URL = getDashboardBaseUrl();
+
+var MEDIATOR_PAGE_URL = BASE_URL + TYPE_MEDIATOR;
+var SEQUENCE_PAGE_URL = BASE_URL + TYPE_SEQUENCE;
+var ENDPOINT_PAGE_URL = BASE_URL + TYPE_ENDPOINT;
+var configs = [
+    {name: TYPE_PROXY, type: 10},
+    {name: TYPE_API, type: 15},
+    {name: TYPE_MESSAGE, type: 22},
+    {name: TYPE_SEQUENCE, type: 32},
+    {name: TYPE_INBOUND_ENDPOINT, type: 37}
+];
 
 class MessageFlow extends Widget {
     constructor(props) {
@@ -17,10 +43,353 @@ class MessageFlow extends Widget {
         this.domElementBtnZoomOut = React.createRef();
         this.domElementBtnZoomFit = React.createRef();
         this.domElementImage = React.createRef();
+
+        //this.widgetChannelManager = new WidgetChannelManager();
+        this.recievedAggregatorData = null;
+        this.recievedConfigEntryData = null;
     }
 
-    drawMessageFlow($) {
-        // Test data
+    /**
+     * Given data array for a message flow, draw message flow in the svg component
+     *
+     * @param $ Jquery selector
+     * @param data Data array for the message flow
+     */
+    drawMessageFlow($, data) {
+        var hiddenLineStyle;
+        if (this.detectIE() !== false) {
+            hiddenLineStyle = 'display: none;';
+        }
+        else {
+            hiddenLineStyle = 'stroke-width: 0px;';
+        }
+        if (data.length === 0) {
+            $(this.domElementCanvas.current).html(this.getEmptyRecordsText());
+            return;
+        }
+        var groups = [];
+        $(this.domElementCanvas.current).empty();
+        var nodes = data;
+
+        // Create the input graph
+        var g = new dagreD3.graphlib.Graph({compound: true})
+            .setGraph({rankdir: "LR"})
+            .setDefaultEdgeLabel(function () {
+                return {};
+            });
+
+        for (var i = 0; i < nodes.length; i++) {
+            if (nodes[i].id != null) {
+                //Set Nodes
+                if (nodes[i].type === "group") {
+                    g.setNode(nodes[i].id, {label: "", clusterLabelPos: 'top'});
+
+                    //Add arbitary nodes for group
+                    g.setNode(nodes[i].id + "-s", {label: nodes[i].label, style: hiddenLineStyle});
+                    // g.setEdge(nodes[i].id + "-s", nodes[i].id + "-e",  { style: 'display: none;; fill: #ffd47f'});
+                    g.setNode(nodes[i].id + "-e", {label: "", style: hiddenLineStyle});
+                    g.setParent(nodes[i].id + "-s", nodes[i].id);
+                    g.setParent(nodes[i].id + "-e", nodes[i].id);
+
+                    groups.push(nodes[i]);
+                } else {
+                    var label = this.buildLabel(nodes[i], $);
+                    g.setNode(nodes[i].id, {labelType: "html", label: label});
+                    // g.setNode(nodes[i].id, {label: nodes[i].label});
+                }
+
+                //Set Edges
+                if (nodes[i].parents != null) {
+                    for (var x = 0; x < nodes[i].parents.length; x++) {
+                        var isParentGroup = false;
+                        for (var y = 0; y < groups.length; y++) {
+                            if (groups[y].id === nodes[i].parents[x] && groups[y].type === "group") {
+                                isParentGroup = true;
+                            }
+                        }
+
+                        if (nodes[i].type === "group") {
+                            if (isParentGroup) {
+                                g.setEdge(nodes[i].parents[x] + "-e", nodes[i].id + "-s", {
+                                    lineInterpolate: 'basis',
+                                    arrowheadClass: 'arrowhead'
+                                });
+                            } else {
+                                g.setEdge(nodes[i].parents[x], nodes[i].id + "-s", {
+                                    lineInterpolate: 'basis',
+                                    arrowheadClass: 'arrowhead'
+                                });
+                            }
+                        } else {
+                            if (isParentGroup) {
+                                g.setEdge(nodes[i].parents[x] + "-e", nodes[i].id, {
+                                    lineInterpolate: 'basis',
+                                    arrowheadClass: 'arrowhead'
+                                });
+                            } else {
+                                g.setEdge(nodes[i].parents[x], nodes[i].id, {
+                                    lineInterpolate: 'basis',
+                                    arrowheadClass: 'arrowhead'
+                                });
+                            }
+                        }
+                    }
+                }
+
+                if (nodes[i].group != null) {
+                    g.setParent(nodes[i].id, nodes[i].group);
+                    if (nodes[i].type !== "group" && !this.isParent(nodes, nodes[i])) {
+                        g.setEdge(nodes[i].group + "-s", nodes[i].id, {style: hiddenLineStyle});
+                        g.setEdge(nodes[i].id, nodes[i].group + "-e", {style: hiddenLineStyle});
+                    }
+
+
+                }
+
+            }
+
+        }
+
+        g.nodes().forEach(function (v) {
+            var node = g.node(v);
+
+            node.rx = node.ry = 7;
+        });
+
+        // Create the renderer
+        var render = new dagreD3.render();
+
+        var svg = d3.select(this.domElementSvg.current);
+        svg.append("g");
+        var inner = svg.select("g"),
+            zoom = d3.zoom().on("zoom", function () {
+                svg.select('g').attr("transform", d3.event.transform)
+            });
+
+        svg.call(zoom);
+        var nanoScrollerSelector = $(this.domElementNano.current);
+        nanoScrollerSelector.nanoScroller();
+        inner.call(render, g);
+
+        // Zoom and scale to fit
+        var graphWidth = g.graph().width + 10;
+        var graphHeight = g.graph().height + 10;
+        // var width = parseInt(svg.style("width").replace(/px/, ""));
+        // var height = parseInt(svg.style("height").replace(/px/, ""));
+        var width = 1400; //todo: Use correct window sizes from SP
+        var height = 808; //todo: Use correct window sizes from SP
+        var zoomScale = Math.min(width / graphWidth, height / graphHeight);
+        var translate = [(width / 2) - ((graphWidth * zoomScale) / 2), (height / 2) - ((graphHeight * zoomScale) / 2) * 0.93];
+
+        svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity.scale(zoomScale));
+        svg.attr('width', width);
+        svg.attr('height', height);
+        // svg.select('g').attr('width')
+        // zoom.event(isUpdate ? svg.transition().duration(500) : d3.select("svg"));
+        //zoom.event(svg);
+        // todo: Fix zooming for buttons
+        d3.selectAll(this.domElementBtnZoomIn.current).on('click', function () {
+            zoomScale += 0.05;
+            this.interpolateZoom(translate, zoomScale, inner, zoom);
+        });
+
+        d3.selectAll(this.domElementBtnZoomOut.current).on('click', function () {
+            if (zoomScale > 0.05) {
+                zoomScale -= 0.05;
+                this.interpolateZoom(translate, zoomScale, inner, zoom);
+            }
+
+        });
+
+        d3.selectAll(this.domElementBtnZoomFit.current).on('click', function () {
+            var zoomScale = Math.min(width / graphWidth, height / graphHeight);
+            var translate = [(width / 2) - ((graphWidth * zoomScale) / 2), (height / 2) - ((graphHeight * zoomScale) / 2) * 0.93];
+            zoom.translate(translate);
+            zoom.scale(zoomScale);
+            zoom.event(svg);
+        });
+    }
+
+    /**
+     * Extract most recent message flow data array for a given component from the database
+     *
+     * @param timeFrom Time duration start position
+     * @param timeTo Time duration end position
+     * @param timeUnit Per which time unit, data should be retrieved(minutes, seconds etc)
+     * @param componentId Name of the component
+     * @param pageType Page name required for the message flow drawing
+     */
+    extractMessageFlowData(timeFrom, timeTo, timeUnit, componentId, pageType) {
+
+        // Extract latest configEntry data row from the datastore
+        super.getWidgetChannelManager().subscribeWidget(
+            this.props.id,
+            this.handleConfigEntryData.bind(this),
+            this.getConfigEntryDataProviderConf('testSort', '\"HealthcareAPI\"', "-1234", "19", "20")
+        );
+
+    }
+
+    getAggregateDataProviderConf(timeFrom, timeTo, timeUnit) {
+        let dataProviderConfigs = this.getProviderConf(aggregatorDataProviderConf);
+        let query = dataProviderConfigs.configs.config.queryData.query;
+        query = query
+            .replace("{{timeRange}}", timeFrom)
+            .replace("{{timeUnit}}", timeUnit)
+        //console.warn(query);
+        dataProviderConfigs.configs.config.queryData.query = query;
+        return dataProviderConfigs;
+    }
+
+    getConfigEntryDataProviderConf(configEntryTableName, componentId, meta_tenantId, timeFrom, timeTo) {
+        let dataProviderConfigs = this.getProviderConf(configEntryDataProviderConf);
+        let query = dataProviderConfigs.configs.config.queryData.query;
+        query = query
+            .replace("{{configEntryTable}}", configEntryTableName)
+            .replace("{{componentId}}", componentId)
+            .replace("{{meta_tenantId}}", meta_tenantId)
+            .replace("{{timeFrom}}", timeFrom)
+            .replace("{{timeTo}}", timeTo)
+        console.warn(query);
+        dataProviderConfigs.configs.config.queryData.query = query;
+        return dataProviderConfigs;
+    }
+
+    handleConfigEntryData(data) {
+        if (data) {
+            this.recievedConfigEntryData = data;
+        } else {
+            this.recievedConfigEntryData = TABLE_DATA_UNAVAILABLE;
+        }
+        let stringData = JSON.stringify(data);
+        console.log("JSON parsed data: " + stringData);
+    }
+
+    getProviderConf(aggregatorDataProviderConf) {
+        let stringifiedDataProvideConf = JSON.stringify(aggregatorDataProviderConf);
+        return JSON.parse(stringifiedDataProvideConf);
+    }
+
+    detectIE() {
+        var ua = window.navigator.userAgent;
+
+        var msie = ua.indexOf('MSIE ');
+        if (msie > 0) {
+            // IE 10 or older => return version number
+            return parseInt(ua.substring(msie + 5, ua.indexOf('.', msie)), 10);
+        }
+
+        var trident = ua.indexOf('Trident/');
+        if (trident > 0) {
+            // IE 11 => return version number
+            var rv = ua.indexOf('rv:');
+            return parseInt(ua.substring(rv + 3, ua.indexOf('.', rv)), 10);
+        }
+
+        var edge = ua.indexOf('Edge/');
+        if (edge > 0) {
+            // Edge (IE 12+) => return version number
+            return parseInt(ua.substring(edge + 5, ua.indexOf('.', edge)), 10);
+        }
+
+        // other browser
+        return false;
+    }
+
+    buildLabel(node, $) {
+        var pageUrl = MEDIATOR_PAGE_URL;
+        if (node.type === "Sequence") {
+            pageUrl = SEQUENCE_PAGE_URL;
+        } else if (node.type === "Endpoint") {
+            pageUrl = ENDPOINT_PAGE_URL;
+        }
+        var hashCode = "";
+        var hiddenParams = '';
+        if (node.hiddenAttributes) {
+            node.hiddenAttributes.forEach(function (item, i) {
+                hiddenParams += '&' + item.name + '=' + item.value;
+                if (item.name === "hashCode") {
+                    hashCode = item.value;
+                }
+            });
+        }
+        var targetUrl = pageUrl + '?' + hiddenParams;
+        console.log("Test : " + targetUrl);
+        var labelText;
+
+        if (node.dataAttributes) {
+            var nodeClasses = "nodeLabel";
+            var nodeWrapClasses = "nodeLabelWrap"
+
+            if (node.dataAttributes[1].value === "Failed") {
+                nodeClasses += " failed-node";
+                nodeWrapClasses += " failed-node";
+
+            }
+            var icon;
+            if (node.type.toLowerCase() === 'mediator') {
+
+                var mediatorName = node.label.split(':')[0].toLowerCase();
+                var imgFolderPath = $(this.domElementImage.current).attr('src').slice(0, -1);
+
+                var imgURL = imgFolderPath + '/portal/public/app/images/mediators/' + mediatorName + '.svg';
+                var defaultImgURL = imgFolderPath + '/portal/public/app/images/mediators/mediator.svg';
+
+                icon = '<img class="mediator-icon" src="' + imgURL + '" onerror="this.src="' + defaultImgURL + '">';
+            } else if (node.type.toLowerCase() === 'endpoint') {
+                icon = '<i class="icon endpoint-icon fw fw-endpoint"></i>';
+            } else {
+                icon = '';
+            }
+
+            // todo: Add functionality to the target URL(When a node is clicked, add necessary functionality)
+            labelText = '<a href="#" class="' + nodeWrapClasses + '">' + icon + '<div class="' + nodeClasses + '" data-node-type="' + node.type + '" data-component-id="' + node.modifiedId
+                + '" data-hash-code="' + hashCode + '" data-target-url="' + targetUrl + '"><h4>' + node.label + "</h4>";
+
+            node.dataAttributes.forEach(function (item, i) {
+                labelText += "<h5><label>" + item.name + " : </label><span>" + item.value + "</span></h5>";
+            });
+        }
+        labelText += "</div></a>";
+        return labelText;
+    };
+
+    interpolateZoom(translate, scale, svg, zoom) {
+        //var self = this;
+        return d3.transition().duration(350).tween("zoom", function () {
+            var iTranslate = d3.interpolate(zoom.translate(), translate),
+                iScale = d3.interpolate(zoom.scale(), scale);
+            return function (t) {
+                zoom.scale(iScale(t)).translate(iTranslate(t));
+                svg.attr("transform", d3.event.transform)
+            };
+        });
+    }
+
+    isParent(searchNodes, id) {
+        for (var x = 0; x < searchNodes.length; x++) {
+            if (searchNodes[x].parent === id) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    getEmptyRecordsText() {
+        return '<div class="status-message">' +
+            '<div class="message message-info">' +
+            '<h4><i class="icon fw fw-info"></i>No records found</h4>' +
+            '<p>Please select a valid date range to view stats.</p>' +
+            '</div>' +
+            '</div>';
+    };
+
+    // shouldComponentUpdate() {
+    //     return false;
+    // }
+
+    componentDidMount() {
+        // // Sample data
         var data = [{
             "id": "HealthcareAPI@0:HealthcareAPI",
             "label": "HealthcareAPI",
@@ -623,321 +992,17 @@ class MessageFlow extends Widget {
             "modifiedId": "HealthcareAPI@39:API_FAULTSEQ"
         }];
 
-        var hiddenLineStyle;
-        if (this.detectIE() !== false) {
-            hiddenLineStyle = 'display: none;';
-        }
-        else {
-            hiddenLineStyle = 'stroke-width: 0px;';
-        }
-        if (data.length === 0) {
-            $(this.domElementCanvas.current).html(this.getEmptyRecordsText());
-            return;
-        }
-        var groups = [];
-        $(this.domElementCanvas.current).empty();
-        var nodes = data;
-        // Create the input graph
-        var g = new dagreD3.graphlib.Graph({compound: true})
-            .setGraph({rankdir: "LR"})
-            .setDefaultEdgeLabel(function () {
-                return {};
-            });
+        // Draw the message flow with the recieved data
+        this.drawMessageFlow($, data);
 
-        for (var i = 0; i < nodes.length; i++) {
-            if (nodes[i].id != null) {
-                //Set Nodes
-                if (nodes[i].type === "group") {
-                    g.setNode(nodes[i].id, {label: "", clusterLabelPos: 'top'});
-
-                    //Add arbitary nodes for group
-                    g.setNode(nodes[i].id + "-s", {label: nodes[i].label, style: hiddenLineStyle});
-                    // g.setEdge(nodes[i].id + "-s", nodes[i].id + "-e",  { style: 'display: none;; fill: #ffd47f'});
-                    g.setNode(nodes[i].id + "-e", {label: "", style: hiddenLineStyle});
-                    g.setParent(nodes[i].id + "-s", nodes[i].id);
-                    g.setParent(nodes[i].id + "-e", nodes[i].id);
-
-                    groups.push(nodes[i]);
-                } else {
-                    var label = this.buildLabel(nodes[i], $);
-                    g.setNode(nodes[i].id, {labelType: "html", label: label});
-                    // g.setNode(nodes[i].id, {label: nodes[i].label});
-                }
-
-                //Set Edges
-                if (nodes[i].parents != null) {
-                    for (var x = 0; x < nodes[i].parents.length; x++) {
-                        var isParentGroup = false;
-                        for (var y = 0; y < groups.length; y++) {
-                            if (groups[y].id === nodes[i].parents[x] && groups[y].type === "group") {
-                                isParentGroup = true;
-                            }
-                        }
-
-                        if (nodes[i].type === "group") {
-                            if (isParentGroup) {
-                                g.setEdge(nodes[i].parents[x] + "-e", nodes[i].id + "-s", {
-                                    lineInterpolate: 'basis',
-                                    arrowheadClass: 'arrowhead'
-                                });
-                            } else {
-                                g.setEdge(nodes[i].parents[x], nodes[i].id + "-s", {
-                                    lineInterpolate: 'basis',
-                                    arrowheadClass: 'arrowhead'
-                                });
-                            }
-                        } else {
-                            if (isParentGroup) {
-                                g.setEdge(nodes[i].parents[x] + "-e", nodes[i].id, {
-                                    lineInterpolate: 'basis',
-                                    arrowheadClass: 'arrowhead'
-                                });
-                            } else {
-                                g.setEdge(nodes[i].parents[x], nodes[i].id, {
-                                    lineInterpolate: 'basis',
-                                    arrowheadClass: 'arrowhead'
-                                });
-                            }
-                        }
-                    }
-                }
-
-                if (nodes[i].group != null) {
-                    g.setParent(nodes[i].id, nodes[i].group);
-                    if (nodes[i].type !== "group" && !this.isParent(nodes, nodes[i])) {
-                        g.setEdge(nodes[i].group + "-s", nodes[i].id, {style: hiddenLineStyle});
-                        g.setEdge(nodes[i].id, nodes[i].group + "-e", {style: hiddenLineStyle});
-                    }
-
-
-                }
-
-            }
-
-        }
-
-        g.nodes().forEach(function (v) {
-            var node = g.node(v);
-
-            node.rx = node.ry = 7;
-        });
-
-        // Create the renderer
-        var render = new dagreD3.render();
-
-        var svg = d3.select(this.domElementSvg.current);
-        svg.append("g");
-        var inner = svg.select("g"),
-            zoom = d3.zoom().on("zoom", function () {
-                svg.select('g').attr("transform", d3.event.transform)
-            });
-
-        svg.call(zoom);
-        var nanoScrollerSelector = $(this.domElementNano.current);
-        nanoScrollerSelector.nanoScroller();
-        inner.call(render, g);
-
-        // Zoom and scale to fit
-        var graphWidth = g.graph().width + 10;
-        var graphHeight = g.graph().height + 10;
-        // var width = parseInt(svg.style("width").replace(/px/, ""));
-        // var height = parseInt(svg.style("height").replace(/px/, ""));
-        var width = 1400; //todo: Use correct window sizes from SP
-        var height = 808; //todo: Use correct window sizes from SP
-        var zoomScale = Math.min(width / graphWidth, height / graphHeight);
-        var translate = [(width / 2) - ((graphWidth * zoomScale) / 2), (height / 2) - ((graphHeight * zoomScale) / 2) * 0.93];
-
-        svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity.scale(zoomScale));
-        svg.attr('width', width);
-        svg.attr('height', height);
-        // svg.select('g').attr('width')
-        // zoom.event(isUpdate ? svg.transition().duration(500) : d3.select("svg"));
-        //zoom.event(svg);
-        // todo: Fix zooming for buttons
-        d3.selectAll(this.domElementBtnZoomIn.current).on('click', function () {
-            zoomScale += 0.05;
-            this.interpolateZoom(translate, zoomScale, inner, zoom);
-        });
-
-        d3.selectAll(this.domElementBtnZoomOut.current).on('click', function () {
-            if (zoomScale > 0.05) {
-                zoomScale -= 0.05;
-                this.interpolateZoom(translate, zoomScale, inner, zoom);
-            }
-
-        });
-
-        d3.selectAll(this.domElementBtnZoomFit.current).on('click', function () {
-            var zoomScale = Math.min(width / graphWidth, height / graphHeight);
-            var translate = [(width / 2) - ((graphWidth * zoomScale) / 2), (height / 2) - ((graphHeight * zoomScale) / 2) * 0.93];
-            zoom.translate(translate);
-            zoom.scale(zoomScale);
-            zoom.event(svg);
-        });
-    }
-
-    detectIE() {
-        var ua = window.navigator.userAgent;
-
-        var msie = ua.indexOf('MSIE ');
-        if (msie > 0) {
-            // IE 10 or older => return version number
-            return parseInt(ua.substring(msie + 5, ua.indexOf('.', msie)), 10);
-        }
-
-        var trident = ua.indexOf('Trident/');
-        if (trident > 0) {
-            // IE 11 => return version number
-            var rv = ua.indexOf('rv:');
-            return parseInt(ua.substring(rv + 3, ua.indexOf('.', rv)), 10);
-        }
-
-        var edge = ua.indexOf('Edge/');
-        if (edge > 0) {
-            // Edge (IE 12+) => return version number
-            return parseInt(ua.substring(edge + 5, ua.indexOf('.', edge)), 10);
-        }
-
-        // other browser
-        return false;
-    }
-
-    buildLabel(node, $) {
-        // var pageUrl = MEDIATOR_PAGE_URL;
-        // if (node.type === "Sequence") {
-        //     pageUrl = SEQUENCE_PAGE_URL;
-        // } else if (node.type === "Endpoint") {
-        //     pageUrl = ENDPOINT_PAGE_URL;
-        // }
-        var hashCode = "";
-        // var hiddenParams = '';
-        // if (node.hiddenAttributes) {
-        //     node.hiddenAttributes.forEach(function(item, i) {
-        //         hiddenParams += '&' + item.name + '=' + item.value;
-        //         if (item.name === "hashCode") {
-        //             hashCode = item.value;
-        //         }
-        //     });
-        // }
-        // var targetUrl = pageUrl + '?' + hiddenParams;
-        var targetUrl = "";
-        var labelText;
-
-        if (node.dataAttributes) {
-            var nodeClasses = "nodeLabel";
-            var nodeWrapClasses = "nodeLabelWrap"
-
-            if (node.dataAttributes[1].value === "Failed") {
-                nodeClasses += " failed-node";
-                nodeWrapClasses += " failed-node";
-
-            }
-            var icon;
-            if (node.type.toLowerCase() === 'mediator') {
-
-                var mediatorName = node.label.split(':')[0].toLowerCase();
-                var imgFolderPath = $(this.domElementImage.current).attr('src').slice(0, -1);
-
-                var imgURL = imgFolderPath + '/portal/public/app/images/mediators/' + mediatorName + '.svg';
-                var defaultImgURL = imgFolderPath + '/portal/public/app/images/mediators/mediator.svg';
-
-                // todo:properly load icons
-                icon = '<img class="mediator-icon" src="' + imgURL + '" onerror="this.onerror=null; this.src="' + defaultImgURL + '">';
-                //icon = "<i class=\"icon fw fw-endpoint fa-square-o\" background-image=url("+imgURL+")></i>";
-
-                // var callbackStatus = false;
-                // $.ajax({
-                //     url: imgURL,
-                //     async: false,
-                //     success: function (data) {
-                //         var $svg = $(data).find('svg');
-                //         $svg = $svg.removeAttr('xmlns:a');
-                //         if (!$svg.attr('viewBox') && $svg.attr('height') && $svg.attr('width')) {
-                //             $svg.attr('viewBox', '0 0 ' + $svg.attr('height') + ' ' + $svg.attr('width'))
-                //         }
-                //         icon = $svg.get(0).outerHTML;
-                //     },
-                //     error: function (data) {
-                //         console.log("Failed ajax");
-                //         $.ajax({
-                //             url: imgFolderPath + 'img/mediator.svg',
-                //             async: false,
-                //             success: function (data) {
-                //                 var $svg = $(data).find('svg');
-                //                 $svg = $svg.removeAttr('xmlns:a');
-                //                 if (!$svg.attr('viewBox') && $svg.attr('height') && $svg.attr('width')) {
-                //                     $svg.attr('viewBox', '0 0 ' + $svg.attr('height') + ' ' + $svg.attr('width'))
-                //                 }
-                //
-                //                 icon = $svg.get(0).outerHTML;
-                //             },
-                //             dataType: 'xml'
-                //         });
-                //     },
-                //     dataType: 'xml'
-                // });
-
-            } else if (node.type.toLowerCase() === 'endpoint') {
-                icon = '<i class="icon endpoint-icon fw fw-endpoint"></i>';
-            } else {
-                icon = '';
-            }
-
-            // todo: Add functionality to the target URL(When a node is clicked, add necessary functionality)
-            labelText = '<a href="#" class="' + nodeWrapClasses + '">' + icon + '<div class="' + nodeClasses + '" data-node-type="' + node.type + '" data-component-id="' + node.modifiedId
-                + '" data-hash-code="' + hashCode + '" data-target-url="' + targetUrl + '"><h4>' + node.label + "</h4>";
-
-            node.dataAttributes.forEach(function (item, i) {
-                labelText += "<h5><label>" + item.name + " : </label><span>" + item.value + "</span></h5>";
-            });
-        }
-        labelText += "</div></a>";
-        return labelText;
-    };
-
-    interpolateZoom(translate, scale, svg, zoom) {
-        //var self = this;
-        return d3.transition().duration(350).tween("zoom", function () {
-            var iTranslate = d3.interpolate(zoom.translate(), translate),
-                iScale = d3.interpolate(zoom.scale(), scale);
-            return function (t) {
-                zoom.scale(iScale(t)).translate(iTranslate(t));
-                svg.attr("transform", d3.event.transform)
-            };
-        });
-    }
-
-    isParent(searchNodes, id) {
-        for (var x = 0; x < searchNodes.length; x++) {
-            if (searchNodes[x].parent === id) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    getEmptyRecordsText() {
-        return '<div class="status-message">' +
-            '<div class="message message-info">' +
-            '<h4><i class="icon fw fw-info"></i>No records found</h4>' +
-            '<p>Please select a valid date range to view stats.</p>' +
-            '</div>' +
-            '</div>';
-    };
-
-    shouldComponentUpdate() {
-        return false;
-    }
-
-    componentDidMount() {
-        this.drawMessageFlow($);
+        // Extract message flow data from the data store
+        this.extractMessageFlowData('\"2018-**-** **:**:**\"', '\"2018-**-** **:**:**\"', '\"seconds\"');
     }
 
     render() {
         return (
             <body>
             <img src="h" className="hidden" ref={this.domElementImage}/>
-            <link rel="stylesheet" type="text/css" href="/css/custom.css"/>
             <div className="nano" ref={this.domElementNano}>
                 <div className="nano-content">
                     <div className="page-content-wrapper">
@@ -959,5 +1024,34 @@ class MessageFlow extends Widget {
         );
     }
 }
+
+function getDashboardBaseUrl() {
+    var currentUrl = window.parent.location.href;
+    var BaseUrlRegex = new RegExp(".*?(portal.*dashboards)");
+    var tenantBaseUrl = BaseUrlRegex.exec(currentUrl)[1];
+    return "/" + tenantBaseUrl + "/" + DASHBOARD_NAME + "/";
+}
+
+function getCurrentPage() {
+    var page, pageName;
+    var href = parent.window.location.href;
+    var lastSegment = href.substr(href.lastIndexOf('/') + 1);
+    if (lastSegment.indexOf('?') == -1) {
+        pageName = lastSegment;
+    } else {
+        pageName = lastSegment.substr(0, lastSegment.indexOf('?'));
+    }
+    return getGadgetConfig(pageName);
+};
+
+function getGadgetConfig(typeName) {
+    var config = null;
+    configs.forEach(function (item, i) {
+        if (item.name === typeName) {
+            config = item;
+        }
+    });
+    return config;
+};
 
 global.dashboard.registerWidget('MessageFlow', MessageFlow);
