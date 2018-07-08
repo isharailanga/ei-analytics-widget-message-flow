@@ -19,6 +19,7 @@ var TYPE_MESSAGE = "message";
 var TENANT_ID = "-1234";
 var CONFIG_ENTRY_TABLE = "configEntry";
 var TABLE_DATA_UNAVAILABLE = "table data unavailable";
+var CONFIG_ENTRY_TABLE = 'configEntry';
 
 var BASE_URL = getDashboardBaseUrl();
 
@@ -43,10 +44,6 @@ class MessageFlow extends Widget {
         this.domElementBtnZoomOut = React.createRef();
         this.domElementBtnZoomFit = React.createRef();
         this.domElementImage = React.createRef();
-
-        //this.widgetChannelManager = new WidgetChannelManager();
-        this.recievedAggregatorData = null;
-        this.recievedConfigEntryData = null;
     }
 
     /**
@@ -216,53 +213,233 @@ class MessageFlow extends Widget {
      * @param timeFrom Time duration start position
      * @param timeTo Time duration end position
      * @param timeUnit Per which time unit, data should be retrieved(minutes, seconds etc)
-     * @param componentId Name of the component
+     * @param entryName Name of the component
      * @param pageType Page name required for the message flow drawing
      */
-    extractMessageFlowData(timeFrom, timeTo, timeUnit, componentId, pageType) {
+    extractMessageFlowData(timeFrom, timeTo, timeUnit, entryName, tenantId) {
 
         // Extract latest configEntry data row from the datastore
+        this.callBackFunction = this.handleConfigEntryData(timeUnit, timeFrom, timeTo, tenantId, entryName).bind(this);
+        let query = this.getConfigEntryDataProviderConf(entryName, tenantId, timeFrom, timeTo);
         super.getWidgetChannelManager().subscribeWidget(
             this.props.id,
-            this.handleConfigEntryData.bind(this),
-            this.getConfigEntryDataProviderConf('testSort', '\"HealthcareAPI\"', "-1234", "19", "20")
+            this.callBackFunction,
+            query
         );
-
     }
 
-    getAggregateDataProviderConf(timeFrom, timeTo, timeUnit) {
-        let dataProviderConfigs = this.getProviderConf(aggregatorDataProviderConf);
+    getConfigEntryDataProviderConf(entryName, meta_tenantId, timeFrom, timeTo) {
+        let dataProviderConfigs = this.getProviderConf(configEntryDataProviderConf);
         let query = dataProviderConfigs.configs.config.queryData.query;
         query = query
-            .replace("{{timeRange}}", timeFrom)
-            .replace("{{timeUnit}}", timeUnit)
-        //console.warn(query);
+            .replace("{{entryName}}", entryName)
+            .replace("{{meta_tenantId}}", meta_tenantId)
+            .replace("{{timeFrom}}", timeFrom)
+            .replace("{{timeTo}}", timeTo)
+        console.warn(timeFrom, timeTo);
         dataProviderConfigs.configs.config.queryData.query = query;
         return dataProviderConfigs;
     }
 
-    getConfigEntryDataProviderConf(configEntryTableName, componentId, meta_tenantId, timeFrom, timeTo) {
-        let dataProviderConfigs = this.getProviderConf(configEntryDataProviderConf);
+    getAggregateDataProviderConf(timeUnit, timeFrom, timeTo, tenantId, hashcode) {
+        let dataProviderConfigs = this.getProviderConf(aggregatorDataProviderConf);
         let query = dataProviderConfigs.configs.config.queryData.query;
         query = query
-            .replace("{{configEntryTable}}", configEntryTableName)
-            .replace("{{componentId}}", componentId)
-            .replace("{{meta_tenantId}}", meta_tenantId)
-            .replace("{{timeFrom}}", timeFrom)
+            .replace("{{timeUnit}}", timeUnit)
+            .replace("{{hashcode}}", '\'' + hashcode + '\'')
+            .replace("{{tenantId}}", tenantId)
             .replace("{{timeTo}}", timeTo)
+            .replace("{{timeFrom}}", timeFrom)
         console.warn(query);
         dataProviderConfigs.configs.config.queryData.query = query;
         return dataProviderConfigs;
     }
 
-    handleConfigEntryData(data) {
-        if (data) {
-            this.recievedConfigEntryData = data;
-        } else {
-            this.recievedConfigEntryData = TABLE_DATA_UNAVAILABLE;
+    handleConfigEntryData(timeUnit, timeFrom, timeTo, tenantId, entryName) {
+        return function (configEntryData) {
+            console.log("handleConfigData: ", configEntryData);
+            if (configEntryData) {
+                let hashcodeIndex = configEntryData.metadata.names.indexOf("hashcode");
+
+                let hashcodeData = configEntryData.data[0][hashcodeIndex];
+                console.warn(timeUnit, timeFrom, timeTo, tenantId, hashcodeData, (this.getAggregateDataProviderConf(timeUnit, timeFrom, timeTo, tenantId, hashcodeData)));
+                this.getWidgetChannelManager().subscribeWidget(
+                    this.props.id,
+                    this.handleAggregateData(configEntryData, entryName).bind(this),
+                    this.getAggregateDataProviderConf(timeUnit, timeFrom, timeTo, tenantId, hashcodeData)
+                );
+            } else {
+                // todo: Handle missing configEntry data
+            }
         }
-        let stringData = JSON.stringify(data);
-        console.log("JSON parsed data: " + stringData);
+    }
+
+    handleAggregateData(configEntryData, entryName) {
+        return function (aggregateData) {
+            if (aggregateData) {
+
+                // Read and store column names and the position mapping in the data arrays
+                let configEntryDataTableIndex = {};
+                configEntryData.metadata.names.forEach((value, index) => {
+                    configEntryDataTableIndex[value] = index;
+                })
+
+                // console.log(aggregateData);
+                let schema = JSON.parse(configEntryData.data[0][configEntryDataTableIndex["configData"]]);
+
+                // Aggregate table and prepare component map
+                var result = [];
+                var componentMap = {};
+                var fields = ["invocations", "totalDuration", "maxDuration", "faults"];
+                var table = aggregateData.data;
+                if (table != null && table.length != 0) {
+                    for (var j = 0; j < table.length; j++) {
+                        var componentInfo = {};
+
+                        // Replace number based indexing with label names
+                        var row = table[j];
+                        aggregateData.metadata.names.forEach((value, index) => {
+                            componentInfo[value] = row[index];
+                        })
+                        var componentId = componentInfo["componentId"];
+                        if (componentMap[componentId] == null) {
+                            componentMap[componentId] = componentInfo;
+                        } else {
+                            for (var field in fields) {
+                                fieldName = fields[field];
+                                componentMap[componentId][fieldName] = componentMap[componentId][fieldName]
+                                    + componentInfo[fieldName];
+                            }
+                        }
+                    }
+                }
+
+                // Populate table data
+                var componentNameRegex = new RegExp("^.*@\\d*:(.*)"); // Eg: HealthCareAPI@9:Resource
+                var groups = [];
+                for (var i = 0; i < schema.length; i++) {
+                    var groupLabel;
+                    if (schema[i] != null) {
+                        var groupId = schema[i]["group"];
+                        var componentId = schema[i]["id"];
+
+
+                        /** change component id when @indirect presents **/
+                        var isIndirectComponent = componentId.indexOf("@indirect"); // todo:Clarify
+
+                        var originalCompId = componentId;
+
+                        if (isIndirectComponent > 0) {
+
+                            // PaymentServiceEp@14:PaymentServiceEp@indirect --> PaymentServiceEp@0:PaymentServiceEp
+
+                            var splitByAt = componentId.split("@"); // ["PaymentServiceEp", "14:PaymentServiceEp", "indirect"]
+                            var splitByColon = splitByAt[1].split(":"); // ["14", "PaymentServiceEp"]
+
+                            componentId = splitByAt[0] + "@0:" + splitByColon[1];
+                            /*
+                                If any remaining entries in the schema has same name part'indirect',
+                                replace it with the newly generated component id
+                             */
+                            for (var j = 0; j < schema.length; j++) {
+                                if (schema[j] != null) {
+                                    var componentIdTmp = schema[j]["id"];
+                                    var componentIdParentTmp = schema[j]["parentId"];
+                                    var tempGroupId = schema[j]["group"];
+                                    if (componentIdTmp == componentId) {
+                                        schema[j]["id"] = originalCompId;
+                                    } else if (componentIdParentTmp == componentId) {
+                                        schema[j]["parentId"] = originalCompId;
+                                    }
+                                    if (tempGroupId == componentId) {
+                                        schema[j]["group"] = originalCompId;
+                                    }
+                                }
+                            }
+                        }
+
+
+                        var componentInfo = componentMap[componentId];
+                        var dataAttributes = [];
+
+                        // Find unique groups
+                        if (schema[i]["group"] != null && groups.indexOf(schema[i]["group"]) == -1) {
+                            groups.push(schema[i]["group"]);
+                        }
+
+                        // Create data attributes
+                        for (var field in fields) {
+                            var fieldName = fields[field];
+                            if (componentInfo != null) {
+                                if (fieldName === "totalDuration") {
+                                    dataAttributes.push({ // Get the average values of multiple entries of the same path
+                                        "name": "AvgDuration",
+                                        "value": (componentInfo[fieldName] / componentInfo["invocations"]).toFixed(2)
+                                    });
+                                } else {
+                                    dataAttributes.push({"name": fieldName, "value": componentInfo[fieldName]});
+                                }
+                            } else {
+                                dataAttributes.push({"name": fieldName, "value": 0});
+                            }
+                        }
+
+                        var componentLabel = componentNameRegex.exec(componentId)[1];
+                        if (componentInfo != null) {
+                            var componentType = componentInfo["componentType"];
+                        } else {
+                            componentType = "UNKNOWN";
+                        }
+
+                        // Create hidden attributes
+                        var hiddenAttributes = [];
+                        hiddenAttributes.push({"name": "entryPoint", "value": entryName.slice(1, -1)});
+                        if (componentType == "Endpoint" || componentType == "Sequence") {
+                            hiddenAttributes.push({"name": "id", "value": componentLabel});
+                        } else {
+                            hiddenAttributes.push({"name": "id", "value": componentId});
+                        }
+
+                        if (schema[i]["parentId"] == schema[i]["group"]) {
+                            result.push({
+                                "id": originalCompId,
+                                "label": componentLabel,
+                                "parents": [],
+                                "group": schema[i]["group"],
+                                "type": componentType,
+                                "dataAttributes": dataAttributes,
+                                "hiddenAttributes": hiddenAttributes,
+                                "modifiedId": componentId
+                            });
+                        } else {
+                            result.push({
+                                "id": originalCompId,
+                                "label": componentLabel,
+                                "parents": [schema[i]["parentId"]],
+                                "group": schema[i]["group"],
+                                "type": componentType,
+                                "dataAttributes": dataAttributes,
+                                "hiddenAttributes": hiddenAttributes,
+                                "modifiedId": componentId
+                            });
+                        }
+                    }
+                }
+                // Defining groups
+                for (var j = 0; j < result.length; j++) {
+                    if (groups.indexOf(result[j]["id"]) >= 0) {
+                        result[j]["type"] = "group";
+                    }
+                }
+
+                // Draw message flow with the processed data
+                // console.log(result);
+                // console.log(JSON.stringify(result));
+                this.drawMessageFlow($, result);
+            } else {
+                // todo : handle this no data returned situation
+            }
+        }
     }
 
     getProviderConf(aggregatorDataProviderConf) {
@@ -314,7 +491,7 @@ class MessageFlow extends Widget {
             });
         }
         var targetUrl = pageUrl + '?' + hiddenParams;
-        console.log("Test : " + targetUrl);
+        // console.log("Test : " + targetUrl);
         var labelText;
 
         if (node.dataAttributes) {
@@ -384,619 +561,619 @@ class MessageFlow extends Widget {
             '</div>';
     };
 
-    // shouldComponentUpdate() {
-    //     return false;
-    // }
+    shouldComponentUpdate() {
+        return false;
+    }
 
     componentDidMount() {
         // // Sample data
-        var data = [{
-            "id": "HealthcareAPI@0:HealthcareAPI",
-            "label": "HealthcareAPI",
-            "parents": [],
-            "group": null,
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "578.50"
-            }, {"name": "MaxDuration", "value": 1060}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@0:HealthcareAPI"
-            }],
-            "modifiedId": "HealthcareAPI@0:HealthcareAPI"
-        }, {
-            "id": "HealthcareAPI@1:Resource",
-            "label": "Resource",
-            "parents": [],
-            "group": "HealthcareAPI@0:HealthcareAPI",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@1:Resource"
-            }],
-            "modifiedId": "HealthcareAPI@1:Resource"
-        }, {
-            "id": "HealthcareAPI@2:API_INSEQ",
-            "label": "API_INSEQ",
-            "parents": [],
-            "group": "HealthcareAPI@1:Resource",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@2:API_INSEQ"
-            }],
-            "modifiedId": "HealthcareAPI@2:API_INSEQ"
-        }, {
-            "id": "HealthcareAPI@3:LogMediator",
-            "label": "LogMediator",
-            "parents": [],
-            "group": "HealthcareAPI@2:API_INSEQ",
-            "type": "UNKNOWN",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@3:LogMediator"
-            }],
-            "modifiedId": "HealthcareAPI@3:LogMediator"
-        }, {
-            "id": "HealthcareAPI@4:SendMediator",
-            "label": "SendMediator",
-            "parents": ["HealthcareAPI@3:LogMediator"],
-            "group": "HealthcareAPI@2:API_INSEQ",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@4:SendMediator"
-            }],
-            "modifiedId": "HealthcareAPI@4:SendMediator"
-        }, {
-            "id": "QueryDoctorEP@5:QueryDoctorEP@indirect",
-            "label": "QueryDoctorEP",
-            "parents": [],
-            "group": "HealthcareAPI@4:SendMediator",
-            "type": "UNKNOWN",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "QueryDoctorEP@0:QueryDoctorEP"
-            }],
-            "modifiedId": "QueryDoctorEP@0:QueryDoctorEP"
-        }, {
-            "id": "HealthcareAPI@6:API_OUTSEQ",
-            "label": "API_OUTSEQ",
-            "parents": ["HealthcareAPI@2:API_INSEQ"],
-            "group": "HealthcareAPI@1:Resource",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@6:API_OUTSEQ"
-            }],
-            "modifiedId": "HealthcareAPI@6:API_OUTSEQ"
-        }, {
-            "id": "HealthcareAPI@7:SendMediator",
-            "label": "SendMediator",
-            "parents": [],
-            "group": "HealthcareAPI@6:API_OUTSEQ",
-            "type": "UNKNOWN",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@7:SendMediator"
-            }],
-            "modifiedId": "HealthcareAPI@7:SendMediator"
-        }, {
-            "id": "HealthcareAPI@8:API_FAULTSEQ",
-            "label": "API_FAULTSEQ",
-            "parents": ["HealthcareAPI@6:API_OUTSEQ"],
-            "group": "HealthcareAPI@1:Resource",
-            "type": "UNKNOWN",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@8:API_FAULTSEQ"
-            }],
-            "modifiedId": "HealthcareAPI@8:API_FAULTSEQ"
-        }, {
-            "id": "HealthcareAPI@9:Resource",
-            "label": "Resource",
-            "parents": [],
-            "group": "HealthcareAPI@0:HealthcareAPI",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "572.00"
-            }, {"name": "MaxDuration", "value": 1048}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@9:Resource"
-            }],
-            "modifiedId": "HealthcareAPI@9:Resource"
-        }, {
-            "id": "HealthcareAPI@10:API_INSEQ",
-            "label": "API_INSEQ",
-            "parents": [],
-            "group": "HealthcareAPI@9:Resource",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "570.00"
-            }, {"name": "MaxDuration", "value": 1044}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "API_INSEQ"
-            }],
-            "modifiedId": "HealthcareAPI@10:API_INSEQ"
-        }, {
-            "id": "HealthcareAPI@11:PropertyMediator:Hospital",
-            "label": "PropertyMediator:Hospital",
-            "parents": [],
-            "group": "HealthcareAPI@10:API_INSEQ",
-            "type": "Mediator",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "7.00"
-            }, {"name": "MaxDuration", "value": 13}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@11:PropertyMediator:Hospital"
-            }],
-            "modifiedId": "HealthcareAPI@11:PropertyMediator:Hospital"
-        }, {
-            "id": "HealthcareAPI@12:PropertyMediator:card_number",
-            "label": "PropertyMediator:card_number",
-            "parents": ["HealthcareAPI@11:PropertyMediator:Hospital"],
-            "group": "HealthcareAPI@10:API_INSEQ",
-            "type": "Mediator",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "0.00"
-            }, {"name": "MaxDuration", "value": 5e-324}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@12:PropertyMediator:card_number"
-            }],
-            "modifiedId": "HealthcareAPI@12:PropertyMediator:card_number"
-        }, {
-            "id": "HealthcareAPI@13:DataMapperMediator",
-            "label": "DataMapperMediator",
-            "parents": ["HealthcareAPI@12:PropertyMediator:card_number"],
-            "group": "HealthcareAPI@10:API_INSEQ",
-            "type": "Mediator",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "444.00"
-            }, {"name": "MaxDuration", "value": 851}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@13:DataMapperMediator"
-            }],
-            "modifiedId": "HealthcareAPI@13:DataMapperMediator"
-        }, {
-            "id": "HealthcareAPI@14:SwitchMediator",
-            "label": "SwitchMediator",
-            "parents": ["HealthcareAPI@13:DataMapperMediator"],
-            "group": "HealthcareAPI@10:API_INSEQ",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "137.00"
-            }, {"name": "MaxDuration", "value": 212}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@14:SwitchMediator"
-            }],
-            "modifiedId": "HealthcareAPI@14:SwitchMediator"
-        }, {
-            "id": "HealthcareAPI@15:LogMediator",
-            "label": "LogMediator",
-            "parents": [],
-            "group": "HealthcareAPI@14:SwitchMediator",
-            "type": "Mediator",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "1.50"
-            }, {"name": "MaxDuration", "value": 2}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@15:LogMediator"
-            }],
-            "modifiedId": "HealthcareAPI@15:LogMediator"
-        }, {
-            "id": "HealthcareAPI@16:PropertyMediator:uri.var.hospital",
-            "label": "PropertyMediator:uri.var.hospital",
-            "parents": ["HealthcareAPI@15:LogMediator"],
-            "group": "HealthcareAPI@14:SwitchMediator",
-            "type": "Mediator",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "17.00"
-            }, {"name": "MaxDuration", "value": 32}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@16:PropertyMediator:uri.var.hospital"
-            }],
-            "modifiedId": "HealthcareAPI@16:PropertyMediator:uri.var.hospital"
-        }, {
-            "id": "HealthcareAPI@17:CallMediator",
-            "label": "CallMediator",
-            "parents": ["HealthcareAPI@16:PropertyMediator:uri.var.hospital"],
-            "group": "HealthcareAPI@14:SwitchMediator",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "66.00"
-            }, {"name": "MaxDuration", "value": 115}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@17:CallMediator"
-            }],
-            "modifiedId": "HealthcareAPI@17:CallMediator"
-        }, {
-            "id": "GrandOakEP@18:GrandOakEP@indirect",
-            "label": "GrandOakEP",
-            "parents": [],
-            "group": "HealthcareAPI@17:CallMediator",
-            "type": "Endpoint",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "72.50"
-            }, {"name": "MaxDuration", "value": 127}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "GrandOakEP"
-            }],
-            "modifiedId": "GrandOakEP@0:GrandOakEP"
-        }, {
-            "id": "HealthcareAPI@19:LogMediator",
-            "label": "LogMediator",
-            "parents": [],
-            "group": "HealthcareAPI@14:SwitchMediator",
-            "type": "UNKNOWN",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@19:LogMediator"
-            }],
-            "modifiedId": "HealthcareAPI@19:LogMediator"
-        }, {
-            "id": "HealthcareAPI@20:PropertyMediator:uri.var.hospital",
-            "label": "PropertyMediator:uri.var.hospital",
-            "parents": ["HealthcareAPI@19:LogMediator"],
-            "group": "HealthcareAPI@14:SwitchMediator",
-            "type": "UNKNOWN",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@20:PropertyMediator:uri.var.hospital"
-            }],
-            "modifiedId": "HealthcareAPI@20:PropertyMediator:uri.var.hospital"
-        }, {
-            "id": "HealthcareAPI@21:CallMediator",
-            "label": "CallMediator",
-            "parents": ["HealthcareAPI@20:PropertyMediator:uri.var.hospital"],
-            "group": "HealthcareAPI@14:SwitchMediator",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@21:CallMediator"
-            }],
-            "modifiedId": "HealthcareAPI@21:CallMediator"
-        }, {
-            "id": "ClemencyEP@22:ClemencyEP@indirect",
-            "label": "ClemencyEP",
-            "parents": [],
-            "group": "HealthcareAPI@21:CallMediator",
-            "type": "UNKNOWN",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "ClemencyEP@0:ClemencyEP"
-            }],
-            "modifiedId": "ClemencyEP@0:ClemencyEP"
-        }, {
-            "id": "HealthcareAPI@23:LogMediator",
-            "label": "LogMediator",
-            "parents": [],
-            "group": "HealthcareAPI@14:SwitchMediator",
-            "type": "UNKNOWN",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@23:LogMediator"
-            }],
-            "modifiedId": "HealthcareAPI@23:LogMediator"
-        }, {
-            "id": "HealthcareAPI@24:PropertyMediator:uri.var.hospital",
-            "label": "PropertyMediator:uri.var.hospital",
-            "parents": ["HealthcareAPI@23:LogMediator"],
-            "group": "HealthcareAPI@14:SwitchMediator",
-            "type": "UNKNOWN",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@24:PropertyMediator:uri.var.hospital"
-            }],
-            "modifiedId": "HealthcareAPI@24:PropertyMediator:uri.var.hospital"
-        }, {
-            "id": "HealthcareAPI@25:CallMediator",
-            "label": "CallMediator",
-            "parents": ["HealthcareAPI@24:PropertyMediator:uri.var.hospital"],
-            "group": "HealthcareAPI@14:SwitchMediator",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@25:CallMediator"
-            }],
-            "modifiedId": "HealthcareAPI@25:CallMediator"
-        }, {
-            "id": "PineValleyEP@26:PineValleyEP@indirect",
-            "label": "PineValleyEP",
-            "parents": [],
-            "group": "HealthcareAPI@25:CallMediator",
-            "type": "UNKNOWN",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "PineValleyEP@0:PineValleyEP"
-            }],
-            "modifiedId": "PineValleyEP@0:PineValleyEP"
-        }, {
-            "id": "HealthcareAPI@27:PropertyMediator:uri.var.appointment_id",
-            "label": "PropertyMediator:uri.var.appointment_id",
-            "parents": ["HealthcareAPI@14:SwitchMediator"],
-            "group": "HealthcareAPI@10:API_INSEQ",
-            "type": "Mediator",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "11.00"
-            }, {"name": "MaxDuration", "value": 19}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@27:PropertyMediator:uri.var.appointment_id"
-            }],
-            "modifiedId": "HealthcareAPI@27:PropertyMediator:uri.var.appointment_id"
-        }, {
-            "id": "HealthcareAPI@28:PropertyMediator:doctor_details",
-            "label": "PropertyMediator:doctor_details",
-            "parents": ["HealthcareAPI@27:PropertyMediator:uri.var.appointment_id"],
-            "group": "HealthcareAPI@10:API_INSEQ",
-            "type": "Mediator",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "4.00"
-            }, {"name": "MaxDuration", "value": 6}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@28:PropertyMediator:doctor_details"
-            }],
-            "modifiedId": "HealthcareAPI@28:PropertyMediator:doctor_details"
-        }, {
-            "id": "HealthcareAPI@29:PropertyMediator:patient_details",
-            "label": "PropertyMediator:patient_details",
-            "parents": ["HealthcareAPI@28:PropertyMediator:doctor_details"],
-            "group": "HealthcareAPI@10:API_INSEQ",
-            "type": "Mediator",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "7.50"
-            }, {"name": "MaxDuration", "value": 13}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@29:PropertyMediator:patient_details"
-            }],
-            "modifiedId": "HealthcareAPI@29:PropertyMediator:patient_details"
-        }, {
-            "id": "HealthcareAPI@30:CallMediator",
-            "label": "CallMediator",
-            "parents": ["HealthcareAPI@29:PropertyMediator:patient_details"],
-            "group": "HealthcareAPI@10:API_INSEQ",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "6.50"
-            }, {"name": "MaxDuration", "value": 12}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@30:CallMediator"
-            }],
-            "modifiedId": "HealthcareAPI@30:CallMediator"
-        }, {
-            "id": "ChannelingFeeEP@31:ChannelingFeeEP@indirect",
-            "label": "ChannelingFeeEP",
-            "parents": [],
-            "group": "HealthcareAPI@30:CallMediator",
-            "type": "Endpoint",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "10.00"
-            }, {"name": "MaxDuration", "value": 12}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "ChannelingFeeEP"
-            }],
-            "modifiedId": "ChannelingFeeEP@0:ChannelingFeeEP"
-        }, {
-            "id": "HealthcareAPI@32:PropertyMediator:actual_fee",
-            "label": "PropertyMediator:actual_fee",
-            "parents": ["HealthcareAPI@30:CallMediator"],
-            "group": "HealthcareAPI@10:API_INSEQ",
-            "type": "Mediator",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "1.00"
-            }, {"name": "MaxDuration", "value": 1}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@32:PropertyMediator:actual_fee"
-            }],
-            "modifiedId": "HealthcareAPI@32:PropertyMediator:actual_fee"
-        }, {
-            "id": "HealthcareAPI@33:PayloadFactoryMediator",
-            "label": "PayloadFactoryMediator",
-            "parents": ["HealthcareAPI@32:PropertyMediator:actual_fee"],
-            "group": "HealthcareAPI@10:API_INSEQ",
-            "type": "Mediator",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "4.00"
-            }, {"name": "MaxDuration", "value": 6}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@33:PayloadFactoryMediator"
-            }],
-            "modifiedId": "HealthcareAPI@33:PayloadFactoryMediator"
-        }, {
-            "id": "HealthcareAPI@34:CallMediator",
-            "label": "CallMediator",
-            "parents": ["HealthcareAPI@33:PayloadFactoryMediator"],
-            "group": "HealthcareAPI@10:API_INSEQ",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "2.00"
-            }, {"name": "MaxDuration", "value": 2}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@34:CallMediator"
-            }],
-            "modifiedId": "HealthcareAPI@34:CallMediator"
-        }, {
-            "id": "SettlePaymentEP@35:SettlePaymentEP@indirect",
-            "label": "SettlePaymentEP",
-            "parents": [],
-            "group": "HealthcareAPI@34:CallMediator",
-            "type": "Endpoint",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "10.00"
-            }, {"name": "MaxDuration", "value": 12}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "SettlePaymentEP"
-            }],
-            "modifiedId": "SettlePaymentEP@0:SettlePaymentEP"
-        }, {
-            "id": "HealthcareAPI@36:RespondMediator",
-            "label": "RespondMediator",
-            "parents": ["HealthcareAPI@34:CallMediator"],
-            "group": "HealthcareAPI@10:API_INSEQ",
-            "type": "Mediator",
-            "dataAttributes": [{"name": "Invocations", "value": 2}, {
-                "name": "AvgDuration",
-                "value": "5.50"
-            }, {"name": "MaxDuration", "value": 10}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@36:RespondMediator"
-            }],
-            "modifiedId": "HealthcareAPI@36:RespondMediator"
-        }, {
-            "id": "HealthcareAPI@37:API_OUTSEQ",
-            "label": "API_OUTSEQ",
-            "parents": ["HealthcareAPI@10:API_INSEQ"],
-            "group": "HealthcareAPI@9:Resource",
-            "type": "group",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@37:API_OUTSEQ"
-            }],
-            "modifiedId": "HealthcareAPI@37:API_OUTSEQ"
-        }, {
-            "id": "HealthcareAPI@38:SendMediator",
-            "label": "SendMediator",
-            "parents": [],
-            "group": "HealthcareAPI@37:API_OUTSEQ",
-            "type": "UNKNOWN",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@38:SendMediator"
-            }],
-            "modifiedId": "HealthcareAPI@38:SendMediator"
-        }, {
-            "id": "HealthcareAPI@39:API_FAULTSEQ",
-            "label": "API_FAULTSEQ",
-            "parents": ["HealthcareAPI@37:API_OUTSEQ"],
-            "group": "HealthcareAPI@9:Resource",
-            "type": "UNKNOWN",
-            "dataAttributes": [{"name": "Invocations", "value": 0}, {
-                "name": "TotalDuration",
-                "value": 0
-            }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-            "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-                "name": "id",
-                "value": "HealthcareAPI@39:API_FAULTSEQ"
-            }],
-            "modifiedId": "HealthcareAPI@39:API_FAULTSEQ"
-        }];
-
-        // Draw the message flow with the recieved data
-        this.drawMessageFlow($, data);
+        // var data = [{
+        //     "id": "HealthcareAPI@0:HealthcareAPI",
+        //     "label": "HealthcareAPI",
+        //     "parents": [],
+        //     "group": null,
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "578.50"
+        //     }, {"name": "MaxDuration", "value": 1060}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@0:HealthcareAPI"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@0:HealthcareAPI"
+        // }, {
+        //     "id": "HealthcareAPI@1:Resource",
+        //     "label": "Resource",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@0:HealthcareAPI",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@1:Resource"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@1:Resource"
+        // }, {
+        //     "id": "HealthcareAPI@2:API_INSEQ",
+        //     "label": "API_INSEQ",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@1:Resource",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@2:API_INSEQ"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@2:API_INSEQ"
+        // }, {
+        //     "id": "HealthcareAPI@3:LogMediator",
+        //     "label": "LogMediator",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@2:API_INSEQ",
+        //     "type": "UNKNOWN",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@3:LogMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@3:LogMediator"
+        // }, {
+        //     "id": "HealthcareAPI@4:SendMediator",
+        //     "label": "SendMediator",
+        //     "parents": ["HealthcareAPI@3:LogMediator"],
+        //     "group": "HealthcareAPI@2:API_INSEQ",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@4:SendMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@4:SendMediator"
+        // }, {
+        //     "id": "QueryDoctorEP@5:QueryDoctorEP@indirect",
+        //     "label": "QueryDoctorEP",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@4:SendMediator",
+        //     "type": "UNKNOWN",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "QueryDoctorEP@0:QueryDoctorEP"
+        //     }],
+        //     "modifiedId": "QueryDoctorEP@0:QueryDoctorEP"
+        // }, {
+        //     "id": "HealthcareAPI@6:API_OUTSEQ",
+        //     "label": "API_OUTSEQ",
+        //     "parents": ["HealthcareAPI@2:API_INSEQ"],
+        //     "group": "HealthcareAPI@1:Resource",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@6:API_OUTSEQ"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@6:API_OUTSEQ"
+        // }, {
+        //     "id": "HealthcareAPI@7:SendMediator",
+        //     "label": "SendMediator",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@6:API_OUTSEQ",
+        //     "type": "UNKNOWN",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@7:SendMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@7:SendMediator"
+        // }, {
+        //     "id": "HealthcareAPI@8:API_FAULTSEQ",
+        //     "label": "API_FAULTSEQ",
+        //     "parents": ["HealthcareAPI@6:API_OUTSEQ"],
+        //     "group": "HealthcareAPI@1:Resource",
+        //     "type": "UNKNOWN",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@8:API_FAULTSEQ"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@8:API_FAULTSEQ"
+        // }, {
+        //     "id": "HealthcareAPI@9:Resource",
+        //     "label": "Resource",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@0:HealthcareAPI",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "572.00"
+        //     }, {"name": "MaxDuration", "value": 1048}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@9:Resource"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@9:Resource"
+        // }, {
+        //     "id": "HealthcareAPI@10:API_INSEQ",
+        //     "label": "API_INSEQ",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@9:Resource",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "570.00"
+        //     }, {"name": "MaxDuration", "value": 1044}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "API_INSEQ"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@10:API_INSEQ"
+        // }, {
+        //     "id": "HealthcareAPI@11:PropertyMediator:Hospital",
+        //     "label": "PropertyMediator:Hospital",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@10:API_INSEQ",
+        //     "type": "Mediator",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "7.00"
+        //     }, {"name": "MaxDuration", "value": 13}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@11:PropertyMediator:Hospital"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@11:PropertyMediator:Hospital"
+        // }, {
+        //     "id": "HealthcareAPI@12:PropertyMediator:card_number",
+        //     "label": "PropertyMediator:card_number",
+        //     "parents": ["HealthcareAPI@11:PropertyMediator:Hospital"],
+        //     "group": "HealthcareAPI@10:API_INSEQ",
+        //     "type": "Mediator",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "0.00"
+        //     }, {"name": "MaxDuration", "value": 5e-324}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@12:PropertyMediator:card_number"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@12:PropertyMediator:card_number"
+        // }, {
+        //     "id": "HealthcareAPI@13:DataMapperMediator",
+        //     "label": "DataMapperMediator",
+        //     "parents": ["HealthcareAPI@12:PropertyMediator:card_number"],
+        //     "group": "HealthcareAPI@10:API_INSEQ",
+        //     "type": "Mediator",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "444.00"
+        //     }, {"name": "MaxDuration", "value": 851}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@13:DataMapperMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@13:DataMapperMediator"
+        // }, {
+        //     "id": "HealthcareAPI@14:SwitchMediator",
+        //     "label": "SwitchMediator",
+        //     "parents": ["HealthcareAPI@13:DataMapperMediator"],
+        //     "group": "HealthcareAPI@10:API_INSEQ",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "137.00"
+        //     }, {"name": "MaxDuration", "value": 212}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@14:SwitchMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@14:SwitchMediator"
+        // }, {
+        //     "id": "HealthcareAPI@15:LogMediator",
+        //     "label": "LogMediator",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@14:SwitchMediator",
+        //     "type": "Mediator",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "1.50"
+        //     }, {"name": "MaxDuration", "value": 2}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@15:LogMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@15:LogMediator"
+        // }, {
+        //     "id": "HealthcareAPI@16:PropertyMediator:uri.var.hospital",
+        //     "label": "PropertyMediator:uri.var.hospital",
+        //     "parents": ["HealthcareAPI@15:LogMediator"],
+        //     "group": "HealthcareAPI@14:SwitchMediator",
+        //     "type": "Mediator",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "17.00"
+        //     }, {"name": "MaxDuration", "value": 32}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@16:PropertyMediator:uri.var.hospital"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@16:PropertyMediator:uri.var.hospital"
+        // }, {
+        //     "id": "HealthcareAPI@17:CallMediator",
+        //     "label": "CallMediator",
+        //     "parents": ["HealthcareAPI@16:PropertyMediator:uri.var.hospital"],
+        //     "group": "HealthcareAPI@14:SwitchMediator",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "66.00"
+        //     }, {"name": "MaxDuration", "value": 115}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@17:CallMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@17:CallMediator"
+        // }, {
+        //     "id": "GrandOakEP@18:GrandOakEP@indirect",
+        //     "label": "GrandOakEP",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@17:CallMediator",
+        //     "type": "Endpoint",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "72.50"
+        //     }, {"name": "MaxDuration", "value": 127}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "GrandOakEP"
+        //     }],
+        //     "modifiedId": "GrandOakEP@0:GrandOakEP"
+        // }, {
+        //     "id": "HealthcareAPI@19:LogMediator",
+        //     "label": "LogMediator",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@14:SwitchMediator",
+        //     "type": "UNKNOWN",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@19:LogMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@19:LogMediator"
+        // }, {
+        //     "id": "HealthcareAPI@20:PropertyMediator:uri.var.hospital",
+        //     "label": "PropertyMediator:uri.var.hospital",
+        //     "parents": ["HealthcareAPI@19:LogMediator"],
+        //     "group": "HealthcareAPI@14:SwitchMediator",
+        //     "type": "UNKNOWN",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@20:PropertyMediator:uri.var.hospital"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@20:PropertyMediator:uri.var.hospital"
+        // }, {
+        //     "id": "HealthcareAPI@21:CallMediator",
+        //     "label": "CallMediator",
+        //     "parents": ["HealthcareAPI@20:PropertyMediator:uri.var.hospital"],
+        //     "group": "HealthcareAPI@14:SwitchMediator",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@21:CallMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@21:CallMediator"
+        // }, {
+        //     "id": "ClemencyEP@22:ClemencyEP@indirect",
+        //     "label": "ClemencyEP",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@21:CallMediator",
+        //     "type": "UNKNOWN",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "ClemencyEP@0:ClemencyEP"
+        //     }],
+        //     "modifiedId": "ClemencyEP@0:ClemencyEP"
+        // }, {
+        //     "id": "HealthcareAPI@23:LogMediator",
+        //     "label": "LogMediator",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@14:SwitchMediator",
+        //     "type": "UNKNOWN",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@23:LogMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@23:LogMediator"
+        // }, {
+        //     "id": "HealthcareAPI@24:PropertyMediator:uri.var.hospital",
+        //     "label": "PropertyMediator:uri.var.hospital",
+        //     "parents": ["HealthcareAPI@23:LogMediator"],
+        //     "group": "HealthcareAPI@14:SwitchMediator",
+        //     "type": "UNKNOWN",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@24:PropertyMediator:uri.var.hospital"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@24:PropertyMediator:uri.var.hospital"
+        // }, {
+        //     "id": "HealthcareAPI@25:CallMediator",
+        //     "label": "CallMediator",
+        //     "parents": ["HealthcareAPI@24:PropertyMediator:uri.var.hospital"],
+        //     "group": "HealthcareAPI@14:SwitchMediator",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@25:CallMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@25:CallMediator"
+        // }, {
+        //     "id": "PineValleyEP@26:PineValleyEP@indirect",
+        //     "label": "PineValleyEP",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@25:CallMediator",
+        //     "type": "UNKNOWN",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "PineValleyEP@0:PineValleyEP"
+        //     }],
+        //     "modifiedId": "PineValleyEP@0:PineValleyEP"
+        // }, {
+        //     "id": "HealthcareAPI@27:PropertyMediator:uri.var.appointment_id",
+        //     "label": "PropertyMediator:uri.var.appointment_id",
+        //     "parents": ["HealthcareAPI@14:SwitchMediator"],
+        //     "group": "HealthcareAPI@10:API_INSEQ",
+        //     "type": "Mediator",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "11.00"
+        //     }, {"name": "MaxDuration", "value": 19}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@27:PropertyMediator:uri.var.appointment_id"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@27:PropertyMediator:uri.var.appointment_id"
+        // }, {
+        //     "id": "HealthcareAPI@28:PropertyMediator:doctor_details",
+        //     "label": "PropertyMediator:doctor_details",
+        //     "parents": ["HealthcareAPI@27:PropertyMediator:uri.var.appointment_id"],
+        //     "group": "HealthcareAPI@10:API_INSEQ",
+        //     "type": "Mediator",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "4.00"
+        //     }, {"name": "MaxDuration", "value": 6}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@28:PropertyMediator:doctor_details"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@28:PropertyMediator:doctor_details"
+        // }, {
+        //     "id": "HealthcareAPI@29:PropertyMediator:patient_details",
+        //     "label": "PropertyMediator:patient_details",
+        //     "parents": ["HealthcareAPI@28:PropertyMediator:doctor_details"],
+        //     "group": "HealthcareAPI@10:API_INSEQ",
+        //     "type": "Mediator",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "7.50"
+        //     }, {"name": "MaxDuration", "value": 13}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@29:PropertyMediator:patient_details"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@29:PropertyMediator:patient_details"
+        // }, {
+        //     "id": "HealthcareAPI@30:CallMediator",
+        //     "label": "CallMediator",
+        //     "parents": ["HealthcareAPI@29:PropertyMediator:patient_details"],
+        //     "group": "HealthcareAPI@10:API_INSEQ",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "6.50"
+        //     }, {"name": "MaxDuration", "value": 12}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@30:CallMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@30:CallMediator"
+        // }, {
+        //     "id": "ChannelingFeeEP@31:ChannelingFeeEP@indirect",
+        //     "label": "ChannelingFeeEP",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@30:CallMediator",
+        //     "type": "Endpoint",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "10.00"
+        //     }, {"name": "MaxDuration", "value": 12}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "ChannelingFeeEP"
+        //     }],
+        //     "modifiedId": "ChannelingFeeEP@0:ChannelingFeeEP"
+        // }, {
+        //     "id": "HealthcareAPI@32:PropertyMediator:actual_fee",
+        //     "label": "PropertyMediator:actual_fee",
+        //     "parents": ["HealthcareAPI@30:CallMediator"],
+        //     "group": "HealthcareAPI@10:API_INSEQ",
+        //     "type": "Mediator",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "1.00"
+        //     }, {"name": "MaxDuration", "value": 1}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@32:PropertyMediator:actual_fee"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@32:PropertyMediator:actual_fee"
+        // }, {
+        //     "id": "HealthcareAPI@33:PayloadFactoryMediator",
+        //     "label": "PayloadFactoryMediator",
+        //     "parents": ["HealthcareAPI@32:PropertyMediator:actual_fee"],
+        //     "group": "HealthcareAPI@10:API_INSEQ",
+        //     "type": "Mediator",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "4.00"
+        //     }, {"name": "MaxDuration", "value": 6}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@33:PayloadFactoryMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@33:PayloadFactoryMediator"
+        // }, {
+        //     "id": "HealthcareAPI@34:CallMediator",
+        //     "label": "CallMediator",
+        //     "parents": ["HealthcareAPI@33:PayloadFactoryMediator"],
+        //     "group": "HealthcareAPI@10:API_INSEQ",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "2.00"
+        //     }, {"name": "MaxDuration", "value": 2}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@34:CallMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@34:CallMediator"
+        // }, {
+        //     "id": "SettlePaymentEP@35:SettlePaymentEP@indirect",
+        //     "label": "SettlePaymentEP",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@34:CallMediator",
+        //     "type": "Endpoint",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "10.00"
+        //     }, {"name": "MaxDuration", "value": 12}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "SettlePaymentEP"
+        //     }],
+        //     "modifiedId": "SettlePaymentEP@0:SettlePaymentEP"
+        // }, {
+        //     "id": "HealthcareAPI@36:RespondMediator",
+        //     "label": "RespondMediator",
+        //     "parents": ["HealthcareAPI@34:CallMediator"],
+        //     "group": "HealthcareAPI@10:API_INSEQ",
+        //     "type": "Mediator",
+        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
+        //         "name": "AvgDuration",
+        //         "value": "5.50"
+        //     }, {"name": "MaxDuration", "value": 10}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@36:RespondMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@36:RespondMediator"
+        // }, {
+        //     "id": "HealthcareAPI@37:API_OUTSEQ",
+        //     "label": "API_OUTSEQ",
+        //     "parents": ["HealthcareAPI@10:API_INSEQ"],
+        //     "group": "HealthcareAPI@9:Resource",
+        //     "type": "group",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@37:API_OUTSEQ"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@37:API_OUTSEQ"
+        // }, {
+        //     "id": "HealthcareAPI@38:SendMediator",
+        //     "label": "SendMediator",
+        //     "parents": [],
+        //     "group": "HealthcareAPI@37:API_OUTSEQ",
+        //     "type": "UNKNOWN",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@38:SendMediator"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@38:SendMediator"
+        // }, {
+        //     "id": "HealthcareAPI@39:API_FAULTSEQ",
+        //     "label": "API_FAULTSEQ",
+        //     "parents": ["HealthcareAPI@37:API_OUTSEQ"],
+        //     "group": "HealthcareAPI@9:Resource",
+        //     "type": "UNKNOWN",
+        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
+        //         "name": "TotalDuration",
+        //         "value": 0
+        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
+        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
+        //         "name": "id",
+        //         "value": "HealthcareAPI@39:API_FAULTSEQ"
+        //     }],
+        //     "modifiedId": "HealthcareAPI@39:API_FAULTSEQ"
+        // }];
+        //
+        // // Draw the message flow with the received data
+        // this.drawMessageFlow($, data);
 
         // Extract message flow data from the data store
-        this.extractMessageFlowData('\"2018-**-** **:**:**\"', '\"2018-**-** **:**:**\"', '\"seconds\"');
+        this.extractMessageFlowData('\'2018-06-01 10:30:19\'', '\'2018-07-28 10:30:19\'', '\"seconds\"', '\"HealthcareAPI\"', '-1234');
     }
 
     render() {
