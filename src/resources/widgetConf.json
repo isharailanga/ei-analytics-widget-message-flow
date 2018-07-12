@@ -3,5 +3,10 @@
   "id": "MessageFlow",
   "thumbnailURL": "",
   "configs": {
+    "pubsub": {
+      "types": [
+        "subscriber"
+      ]
+    }
   }
 }

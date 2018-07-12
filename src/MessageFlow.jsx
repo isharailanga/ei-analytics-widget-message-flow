@@ -6,6 +6,10 @@ import * as d3 from 'd3';
 import './custom.css';
 import aggregatorDataProviderConf from './resources/aggregatorDataProviderConf.json';
 import configEntryDataProviderConf from './resources/configEntryDataProviderConf.json';
+import messageFlowStreamEventDataProviderConf from './resources/messageFlowStreamEventDataProviderConf.json';
+import {withStyles} from '@material-ui/core/styles';
+import CircularProgress from '@material-ui/core/CircularProgress';
+import moment from 'moment';
 import nanoScroller from 'nanoscroller/bin/javascripts/jquery.nanoscroller';
 
 var TYPE_MEDIATOR = 'mediator';
@@ -34,6 +38,11 @@ var configs = [
     {name: TYPE_INBOUND_ENDPOINT, type: 37}
 ];
 
+var centerDiv = {
+    textAlign: 'center',
+    verticalAlign: 'middle'
+};
+
 class MessageFlow extends Widget {
     constructor(props) {
         super(props);
@@ -44,6 +53,22 @@ class MessageFlow extends Widget {
         this.domElementBtnZoomOut = React.createRef();
         this.domElementBtnZoomFit = React.createRef();
         this.domElementImage = React.createRef();
+        this.domElementWaiting = React.createRef();
+
+        this.parameters = {
+            timeFrom: null,
+            timeTo: null,
+            timeUnit: null,
+            entryName: null,
+            meta_tenantId: '-1234'
+        };
+        this.handleRecievedMessage = this.handleMessage.bind(this);
+
+        this.state = {
+            dataUnavailable: true,
+            height: props.height,
+            width: props.width
+        };
     }
 
     /**
@@ -156,6 +181,8 @@ class MessageFlow extends Widget {
         // Create the renderer
         var render = new dagreD3.render();
 
+        $(this.domElementSvg.current).empty();
+
         var svg = d3.select(this.domElementSvg.current);
         svg.append("g");
         var inner = svg.select("g"),
@@ -173,10 +200,10 @@ class MessageFlow extends Widget {
         var graphHeight = g.graph().height + 10;
         // var width = parseInt(svg.style("width").replace(/px/, ""));
         // var height = parseInt(svg.style("height").replace(/px/, ""));
-        var width = 1400; //todo: Use correct window sizes from SP
-        var height = 808; //todo: Use correct window sizes from SP
+        var width = this.state.width; //todo: Use correct window sizes from SP
+        var height = this.state.height; //todo: Use correct window sizes from SP
         var zoomScale = Math.min(width / graphWidth, height / graphHeight);
-        var translate = [(width / 2) - ((graphWidth * zoomScale) / 2), (height / 2) - ((graphHeight * zoomScale) / 2) * 0.93];
+        var translate = [0, 0];
 
         svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity.scale(zoomScale));
         svg.attr('width', width);
@@ -208,7 +235,8 @@ class MessageFlow extends Widget {
     }
 
     /**
-     * Extract most recent message flow data array for a given component from the database
+     * Extract most recent entry point message flow data array for a given component from the database for
+     * proxy, api and inbound endpoint message flows
      *
      * @param timeFrom Time duration start position
      * @param timeTo Time duration end position
@@ -216,16 +244,277 @@ class MessageFlow extends Widget {
      * @param entryName Name of the component
      * @param pageType Page name required for the message flow drawing
      */
-    extractMessageFlowData(timeFrom, timeTo, timeUnit, entryName, tenantId) {
+    extractEntryPointMessageFlowData(timeFrom, timeTo, timeUnit, entryName, tenantId) {
 
         // Extract latest configEntry data row from the datastore
+        this.setState({
+            dataUnavailable: true
+        });
         this.callBackFunction = this.handleConfigEntryData(timeUnit, timeFrom, timeTo, tenantId, entryName).bind(this);
         let query = this.getConfigEntryDataProviderConf(entryName, tenantId, timeFrom, timeTo);
+        console.log(JSON.stringify(query));
         super.getWidgetChannelManager().subscribeWidget(
             this.props.id,
             this.callBackFunction,
             query
         );
+    }
+
+    /**
+     * Message flow data extraction
+     */
+    extractMessageFlow(messageId, meta_tenantId) {
+
+        // Prepare query to read from event stream table
+        let dataProviderConfigs = this.getProviderConf(messageFlowStreamEventDataProviderConf);
+        let query = dataProviderConfigs.configs.config.queryData.query;
+        query = query
+            .replace("{{messageFlowId}}", messageId)
+            .replace("{{meta_tenantId}}", meta_tenantId);
+        dataProviderConfigs.configs.config.queryData.query = query;
+
+        // Query from the table
+        console.log(JSON.stringify(query));
+        super.getWidgetChannelManager().subscribeWidget(
+            this.props.id,
+            this.handleMessageFlowEventStreamData(meta_tenantId).bind(this),
+            query
+        );
+    }
+
+    handleMessageFlowEventStreamData(meta_tenantId) {
+        return function (components) {
+            if (components[0] != null && components[0]["values"] != null) {
+                var entryPointHashCode = components[0]["values"]["entryPointHashcode"];
+                var entryPoint = components[0]["values"]["entryPoint"];
+
+                // Read only one entry from configEntry table
+                let dataProviderConfigs = this.getProviderConf(messageFlowConfigEntryDataProviderConf);
+                let query = dataProviderConfigs.configs.config.queryData.query;
+                query = query
+                    .replace("{{hashcode}}", entryPointHashCode)
+                    .replace("{{meta_tenantId}}", meta_tenantId);
+                dataProviderConfigs.configs.config.queryData.query = query;
+
+                // Query from the table
+                this.super.getWidgetChannelManager().subscribeWidget(
+                    this.props.id,
+                    this.handleMessageFlowConfigEntryData(components).bind(this),
+                    query
+                );
+            }
+            else {
+                // todo: Handle null data scenario
+            }
+        }
+    }
+
+    handleMessageFlowConfigEntryData(components) {
+        return function (config) {
+            // Get all sequence components hashcodes
+            let sequenceHashcodes = [];
+            components.forEach((component) => {
+                if (component[componentInfo] == "Sequence") {
+                    sequenceHashcodes.push(component["hashCode"]);
+                }
+            });
+            let dataProviderConfigs = this.getProviderConf(messageFlowComponentConfigEntryDataProviderConf);
+            let query = dataProviderConfigs.configs.config.queryData.query;
+            query = query
+                .replace("{{hashcodeArray}}", sequenceHashcodes)
+                .replace("{{meta_tenantId}}", meta_tenantId);
+            dataProviderConfigs.configs.config.queryData.query = query;
+
+            // Query from the table
+            this.super.getWidgetChannelManager().subscribeWidget(
+                this.props.id,
+                this.handleMessageFlowComponentConfigEntryData(components, config).bind(this),
+                query
+            );
+        }
+    }
+
+    handleMessageFlowComponentConfigEntryData(components, config) {
+        return function (seqConfigs) {
+            // todo: seqConfigs contain configEntries with hashcodes. Use this data to fix schema injecting
+            var schema = JSON.parse(config["values"]["configData"]);
+
+            // Prepare component map
+            var componentMap = {};
+            if (components != null) {
+                for (var i = 0; i < components.length; i++) {
+                    var component = components[i];
+                    var componentInfo = component["values"];
+
+                    if (componentInfo != null) {
+                        var componentId = componentInfo["componentId"];
+
+                        // get schema of referenced sequences and add it to the overall schema
+                        if ("Sequence" == componentInfo["componentType"]) {
+                            var query = stringify({
+                                "query": "_hashcode : \"" + componentInfo["hashCode"] + "\" AND meta_tenantId : [" + tenantId + " TO " + tenantId + "]",
+                                "start": 0,
+                                "count": 1
+                            });
+                            var seqConfigResp = connector.search(superTenantId, tableName, query);
+                            var seqConfig = JSON.parse(seqConfigResp.getMessage())[0];
+                            if (seqConfig != null) {
+                                var seqSchema = JSON.parse(seqConfig["values"]["configData"]);
+                                for (var j = 0; j < seqSchema.length; j++) {
+                                    schema.push(seqSchema[j]);
+                                }
+                            }
+                        }
+                        componentMap[componentId] = componentInfo;
+                    }
+                }
+            }
+
+            var removedComponents = [];
+            // Populate table data
+            var componentNameRegex = new RegExp("^.*@\\d*:(.*)");
+            var groups = [];
+            var compIds = [];
+            for (var i = 0; i < schema.length; i++) {
+                var groupLabel;
+                if (schema[i] != null) {
+                    var groupId = schema[i]["group"];
+                    var componentId = schema[i]["id"];
+
+                    var isIndirectComponent = componentId.indexOf("@indirect");
+                    var originalCompId = componentId;
+                    if (isIndirectComponent > 0) {
+                        // PaymentServiceEp@14:PaymentServiceEp@indirect --> PaymentServiceEp@0:PaymentServiceEp
+                        var splitByAt = componentId.split("@"); // ["PaymentServiceEp", "14:PaymentServiceEp", "indirect"]
+                        var splitByColon = splitByAt[1].split(":"); // ["14", "PaymentServiceEp"]
+                        componentId = splitByAt[0] + "@0:" + splitByColon[1];
+                        for (var j = 0; j < schema.length; j++) {
+                            if (schema[j] != null) {
+                                var componentIdTmp = schema[j]["id"];
+                                var componentIdParentTmp = schema[j]["parentId"];
+                                var tempGroupId = schema[j]["group"];
+                                if (componentIdTmp == componentId) {
+                                    schema[j]["id"] = originalCompId;
+                                }
+                                if (componentIdParentTmp == componentId) {
+                                    schema[j]["parentId"] = originalCompId;
+                                }
+                                if (tempGroupId == componentId) {
+                                    schema[j]["group"] = originalCompId;
+                                }
+                            }
+                        }
+                    }
+
+                    var componentInfo = null;
+                    if (componentId != null) {
+                        componentInfo = componentMap[componentId];
+                    }
+                    var dataAttributes = [];
+                    var hiddenAttributes = [];
+                    var componentLabel = componentNameRegex.exec(componentId)[1];
+
+                    // Find unique groups
+                    if (schema[i]["group"] != null && groups.indexOf(schema[i]["group"]) == -1) {
+                        groups.push(schema[i]["group"]);
+                    }
+
+
+                    // Create data attributes
+                    if (componentInfo != null) {
+                        dataAttributes.push({"name": "Duration", "value": componentInfo["duration"]});
+                        if (componentInfo["faultCount"] == 0) {
+                            dataAttributes.push({"name": "Status", "value": "Success"});
+                        } else {
+                            dataAttributes.push({"name": "Status", "value": "Failed"});
+                        }
+                        componentType = componentInfo["componentType"];
+                        hashCode = componentInfo["hashCode"];
+
+                        hiddenAttributes.push({"name": "entryPoint", "value": entryPoint});
+                        hiddenAttributes.push({"name": "hashCode", "value": hashCode});
+
+                        // for Sequences and Endpoints, id should be the "name", since name is used for drill down searches
+                        if (componentType == "Endpoint" || componentType == "Sequence") {
+                            hiddenAttributes.push({"name": "id", "value": componentLabel});
+                        } else {
+                            hiddenAttributes.push({"name": "id", "value": componentId});
+                        }
+
+                        var compId = schema[i]["id"];
+                        var parentId = schema[i]["parentId"];
+                        if (compIds.indexOf(compId) < 0) {
+                            compIds.push(compId);
+                        }
+                        if (parentId != null && (compIds.indexOf(parentId) < 0)) {
+                            var matchingParentId;
+
+                            // This logic traverse towards the root of the configuration tree from
+                            // the current node, until it finds the parent of the node or any ancestor node
+                            // exists within the message flow. If any node found, it assigns the node as
+                            // its parent.  This link is used to draw the message flow.
+                            for (var j = 1; j < schema.length; j++) {
+                                if (compIds.indexOf(schema[i - j]["parentId"]) != -1) {
+                                    matchingParentId = schema[i - j]["parentId"];
+                                    break;
+                                }
+                            }
+                            tmpResult.push({
+                                "id": originalCompId,
+                                "label": componentLabel,
+                                "parents": [matchingParentId],
+                                "group": schema[i]["group"],
+                                "type": componentType,
+                                "dataAttributes": dataAttributes,
+                                "hiddenAttributes": hiddenAttributes,
+                                "modifiedId": componentId
+                            });
+                        } else if (schema[i]["parentId"] == schema[i]["group"]) {
+                            tmpResult.push({
+                                "id": originalCompId,
+                                "label": componentLabel,
+                                "parents": [],
+                                "group": schema[i]["group"],
+                                "type": componentType,
+                                "dataAttributes": dataAttributes,
+                                "hiddenAttributes": hiddenAttributes,
+                                "modifiedId": componentId
+                            });
+                        } else {
+                            tmpResult.push({
+                                "id": originalCompId,
+                                "label": componentLabel,
+                                "parents": [schema[i]["parentId"]],
+                                "group": schema[i]["group"],
+                                "type": componentType,
+                                "dataAttributes": dataAttributes,
+                                "hiddenAttributes": hiddenAttributes,
+                                "modifiedId": componentId
+                            });
+                        }
+                    } else {
+                        removedComponents.push(componentId);
+                    }
+                }
+            }
+            compIds = null;
+
+            // Cleanup
+            for (var k = 0; k < tmpResult.length; k++) {
+                var group = tmpResult[k]["group"];
+                var parentId = tmpResult[k]["parents"];
+                if (removedComponents.indexOf(group) == -1 && removedComponents.indexOf(parentId[0]) == -1) {
+                    result.push(tmpResult[k]);
+                }
+            }
+
+
+            for (var j = 0; j < result.length; j++) {
+                if (groups.indexOf(result[j]["id"]) >= 0) {
+                    result[j]["type"] = "group";
+                }
+            }
+        }
     }
 
     getConfigEntryDataProviderConf(entryName, meta_tenantId, timeFrom, timeTo) {
@@ -257,12 +546,10 @@ class MessageFlow extends Widget {
 
     handleConfigEntryData(timeUnit, timeFrom, timeTo, tenantId, entryName) {
         return function (configEntryData) {
-            console.log("handleConfigData: ", configEntryData);
             if (configEntryData) {
                 let hashcodeIndex = configEntryData.metadata.names.indexOf("hashcode");
 
                 let hashcodeData = configEntryData.data[0][hashcodeIndex];
-                console.warn(timeUnit, timeFrom, timeTo, tenantId, hashcodeData, (this.getAggregateDataProviderConf(timeUnit, timeFrom, timeTo, tenantId, hashcodeData)));
                 this.getWidgetChannelManager().subscribeWidget(
                     this.props.id,
                     this.handleAggregateData(configEntryData, entryName).bind(this),
@@ -277,7 +564,9 @@ class MessageFlow extends Widget {
     handleAggregateData(configEntryData, entryName) {
         return function (aggregateData) {
             if (aggregateData) {
-
+                this.setState({
+                    dataUnavailable: false
+                });
                 // Read and store column names and the position mapping in the data arrays
                 let configEntryDataTableIndex = {};
                 configEntryData.metadata.names.forEach((value, index) => {
@@ -292,7 +581,7 @@ class MessageFlow extends Widget {
                 var componentMap = {};
                 var fields = ["invocations", "totalDuration", "maxDuration", "faults"];
                 var table = aggregateData.data;
-                if (table != null && table.length != 0) {
+                if (table != null && table.length !== 0) {
                     for (var j = 0; j < table.length; j++) {
                         var componentInfo = {};
 
@@ -346,12 +635,12 @@ class MessageFlow extends Widget {
                                     var componentIdTmp = schema[j]["id"];
                                     var componentIdParentTmp = schema[j]["parentId"];
                                     var tempGroupId = schema[j]["group"];
-                                    if (componentIdTmp == componentId) {
+                                    if (componentIdTmp === componentId) {
                                         schema[j]["id"] = originalCompId;
-                                    } else if (componentIdParentTmp == componentId) {
+                                    } else if (componentIdParentTmp === componentId) {
                                         schema[j]["parentId"] = originalCompId;
                                     }
-                                    if (tempGroupId == componentId) {
+                                    if (tempGroupId === componentId) {
                                         schema[j]["group"] = originalCompId;
                                     }
                                 }
@@ -363,7 +652,7 @@ class MessageFlow extends Widget {
                         var dataAttributes = [];
 
                         // Find unique groups
-                        if (schema[i]["group"] != null && groups.indexOf(schema[i]["group"]) == -1) {
+                        if (schema[i]["group"] != null && groups.indexOf(schema[i]["group"]) === -1) {
                             groups.push(schema[i]["group"]);
                         }
 
@@ -394,13 +683,13 @@ class MessageFlow extends Widget {
                         // Create hidden attributes
                         var hiddenAttributes = [];
                         hiddenAttributes.push({"name": "entryPoint", "value": entryName.slice(1, -1)});
-                        if (componentType == "Endpoint" || componentType == "Sequence") {
+                        if (componentType === "Endpoint" || componentType === "Sequence") {
                             hiddenAttributes.push({"name": "id", "value": componentLabel});
                         } else {
                             hiddenAttributes.push({"name": "id", "value": componentId});
                         }
 
-                        if (schema[i]["parentId"] == schema[i]["group"]) {
+                        if (schema[i]["parentId"] === schema[i]["group"]) {
                             result.push({
                                 "id": originalCompId,
                                 "label": componentLabel,
@@ -507,10 +796,9 @@ class MessageFlow extends Widget {
             if (node.type.toLowerCase() === 'mediator') {
 
                 var mediatorName = node.label.split(':')[0].toLowerCase();
-                var imgFolderPath = $(this.domElementImage.current).attr('src').slice(0, -1);
 
-                var imgURL = imgFolderPath + '/portal/public/app/images/mediators/' + mediatorName + '.svg';
-                var defaultImgURL = imgFolderPath + '/portal/public/app/images/mediators/mediator.svg';
+                var imgURL = '/portal/public/app/images/mediators/' + mediatorName + '.svg';
+                var defaultImgURL = '/portal/public/app/images/mediators/mediator.svg';
 
                 icon = '<img class="mediator-icon" src="' + imgURL + '" onerror="this.src="' + defaultImgURL + '">';
             } else if (node.type.toLowerCase() === 'endpoint') {
@@ -562,7 +850,48 @@ class MessageFlow extends Widget {
     };
 
     shouldComponentUpdate() {
-        return false;
+        return true;
+    }
+
+    componentWillMount() {
+        super.subscribe(this.handleRecievedMessage);
+    }
+
+    handleMessage(recievedMessage) {
+        console.log(JSON.stringify(message));
+        let message;
+        if (typeof recievedMessage == "string") {
+            message = JSON.parse(recievedMessage);
+        }
+        else {
+            message = recievedMessage;
+        }
+
+        if ("granularity" in message) {
+            this.parameters.timeFrom = '\'' + moment(message.from).format("YYYY-MM-DD HH:mm:ss") + '\'';
+            this.parameters.timeTo = '\'' + moment(message.to).format("YYYY-MM-DD HH:mm:ss") + '\'';
+            this.parameters.timeUnit = '\'' + message.granularity + 's' + '\'';
+        }
+
+        if ("selectedComponent" in message) {
+            this.parameters.entryName = '\'' + message.selectedComponent + '\'';
+        }
+
+        $(this.domElementSvg.current).empty();
+
+        if (this.parameters.timeFrom != null
+            && this.parameters.timeTo != null
+            && this.parameters.timeUnit != null
+            && this.parameters.entryName != null) {
+
+            this.extractEntryPointMessageFlowData(
+                this.parameters.timeFrom,
+                this.parameters.timeTo,
+                this.parameters.timeUnit,
+                this.parameters.entryName,
+                this.parameters.meta_tenantId
+            );
+        }
     }
 
     componentDidMount() {
@@ -1172,14 +1501,55 @@ class MessageFlow extends Widget {
         // // Draw the message flow with the received data
         // this.drawMessageFlow($, data);
 
-        // Extract message flow data from the data store
-        this.extractMessageFlowData('\'2018-06-01 10:30:19\'', '\'2018-07-28 10:30:19\'', '\"seconds\"', '\"HealthcareAPI\"', '-1234');
+        // Extract message flow data from the data store for PROXY and API
+        // this.extractEntryPointMessageFlowData(
+        //     this.parameters.timeFrom,
+        //     this.parameters.timeTo,
+        //     this.parameters.timeUnit,
+        //     this.parameters.entryName,
+        //     this.parameters.meta_tenantId
+        // );
     }
+
+    noParameters() {
+        var page = this.getCurrentPage();
+        switch (page.name) {
+            case 'api':
+                return 'Please select an API and a valid date range to view stats.';
+                break;
+            case 'proxy':
+                return 'Please select a Proxy Service and a valid date range to view stats.';
+                break;
+            case 'sequences':
+                return 'Please select a Sequence and a valid date range to view stats.';
+                break;
+            case 'endpoint':
+                return 'Please select an Endpoint and a valid date range to view stats.';
+                break;
+            case 'inboundEndpoint':
+                return 'Please select an Inbound Endpoint and a valid date range to view stats.';
+                break;
+            default:
+                return 'Please select a valid date range to view stats';
+        }
+        ;
+    }
+
+    getCurrentPage() {
+        var page, pageName;
+        var href = parent.window.location.href;
+        var lastSegment = href.substr(href.lastIndexOf('/') + 1);
+        if (lastSegment.indexOf('?') === -1) {
+            pageName = lastSegment;
+        } else {
+            pageName = lastSegment.substr(0, lastSegment.indexOf('?'));
+        }
+        return getGadgetConfig(pageName);
+    };
 
     render() {
         return (
             <body>
-            <img src="h" className="hidden" ref={this.domElementImage}/>
             <div className="nano" ref={this.domElementNano}>
                 <div className="nano-content">
                     <div className="page-content-wrapper">
@@ -1192,7 +1562,16 @@ class MessageFlow extends Widget {
                                 <i className="fw fw-square-outline"></i>
                             </button>
                         </div>
-                        <div id="canvas" ref={this.domElementCanvas}></div>
+                        <div id="canvas" ref={this.domElementCanvas}>
+                            {this.state.dataUnavailable === true ?
+                                <div class="status-message">
+                                    <div class="message message-info">
+                                        <h4 style={centerDiv}>
+                                            <i class="icon fw fw-info"></i> No records found</h4>
+                                        <p style={centerDiv}>{this.noParameters()}</p>
+                                    </div>
+                                </div> : null}
+                        </div>
                         <svg id="svg-canvas" width="100%" height="100%" ref={this.domElementSvg}></svg>
                     </div>
                 </div>
@@ -1208,18 +1587,6 @@ function getDashboardBaseUrl() {
     var tenantBaseUrl = BaseUrlRegex.exec(currentUrl)[1];
     return "/" + tenantBaseUrl + "/" + DASHBOARD_NAME + "/";
 }
-
-function getCurrentPage() {
-    var page, pageName;
-    var href = parent.window.location.href;
-    var lastSegment = href.substr(href.lastIndexOf('/') + 1);
-    if (lastSegment.indexOf('?') == -1) {
-        pageName = lastSegment;
-    } else {
-        pageName = lastSegment.substr(0, lastSegment.indexOf('?'));
-    }
-    return getGadgetConfig(pageName);
-};
 
 function getGadgetConfig(typeName) {
     var config = null;
