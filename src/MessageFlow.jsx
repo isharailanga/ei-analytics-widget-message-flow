@@ -6,11 +6,8 @@ import * as d3 from 'd3';
 import './custom.css';
 import aggregatorDataProviderConf from './resources/aggregatorDataProviderConf.json';
 import configEntryDataProviderConf from './resources/configEntryDataProviderConf.json';
-import messageFlowStreamEventDataProviderConf from './resources/messageFlowStreamEventDataProviderConf.json';
-import {withStyles} from '@material-ui/core/styles';
-import CircularProgress from '@material-ui/core/CircularProgress';
 import moment from 'moment';
-import nanoScroller from 'nanoscroller/bin/javascripts/jquery.nanoscroller';
+import nanoScrollerSelector from 'nanoscroller';
 
 var TYPE_MEDIATOR = 'mediator';
 var TYPE_SEQUENCE = 'sequences';
@@ -20,23 +17,12 @@ var TYPE_PROXY = "proxy";
 var TYPE_API = "api";
 var TYPE_INBOUND_ENDPOINT = "inbound";
 var TYPE_MESSAGE = "message";
-var TENANT_ID = "-1234";
-var CONFIG_ENTRY_TABLE = "configEntry";
-var TABLE_DATA_UNAVAILABLE = "table data unavailable";
-var CONFIG_ENTRY_TABLE = 'configEntry';
 
 var BASE_URL = getDashboardBaseUrl();
 
 var MEDIATOR_PAGE_URL = BASE_URL + TYPE_MEDIATOR;
 var SEQUENCE_PAGE_URL = BASE_URL + TYPE_SEQUENCE;
 var ENDPOINT_PAGE_URL = BASE_URL + TYPE_ENDPOINT;
-var configs = [
-    {name: TYPE_PROXY, type: 10},
-    {name: TYPE_API, type: 15},
-    {name: TYPE_MESSAGE, type: 22},
-    {name: TYPE_SEQUENCE, type: 32},
-    {name: TYPE_INBOUND_ENDPOINT, type: 37}
-];
 
 var centerDiv = {
     textAlign: 'center',
@@ -46,29 +32,31 @@ var centerDiv = {
 class MessageFlow extends Widget {
     constructor(props) {
         super(props);
-        this.domElementCanvas = React.createRef();
-        this.domElementSvg = React.createRef();
-        this.domElementNano = React.createRef();
-        this.domElementBtnZoomIn = React.createRef();
-        this.domElementBtnZoomOut = React.createRef();
-        this.domElementBtnZoomFit = React.createRef();
-        this.domElementImage = React.createRef();
-        this.domElementWaiting = React.createRef();
 
         this.parameters = {
             timeFrom: null,
             timeTo: null,
             timeUnit: null,
-            entryName: null,
+            selectedComponantID: null,
             meta_tenantId: '-1234'
         };
+
         this.handleRecievedMessage = this.handleMessage.bind(this);
 
         this.state = {
             dataUnavailable: true,
-            height: props.height,
-            width: props.width
+            height: this.props.glContainer.height,
+            width: this.props.glContainer.width
         };
+
+        this.props.glContainer.on('resize', this.handleResize.bind(this));
+    }
+
+    handleResize() {
+        this.setState({
+            width: this.props.glContainer.width,
+            height: this.props.glContainer.height
+        });
     }
 
     /**
@@ -86,11 +74,11 @@ class MessageFlow extends Widget {
             hiddenLineStyle = 'stroke-width: 0px;';
         }
         if (data.length === 0) {
-            $(this.domElementCanvas.current).html(this.getEmptyRecordsText());
+            $(this.domElementCanvas).html(this.getEmptyRecordsText());
             return;
         }
         var groups = [];
-        $(this.domElementCanvas.current).empty();
+        $(this.domElementCanvas).empty();
         var nodes = data;
 
         // Create the input graph
@@ -181,9 +169,9 @@ class MessageFlow extends Widget {
         // Create the renderer
         var render = new dagreD3.render();
 
-        $(this.domElementSvg.current).empty();
+        $(this.domElementSvg).empty();
 
-        var svg = d3.select(this.domElementSvg.current);
+        var svg = d3.select(this.domElementSvg);
         svg.append("g");
         var inner = svg.select("g"),
             zoom = d3.zoom().on("zoom", function () {
@@ -191,33 +179,28 @@ class MessageFlow extends Widget {
             });
 
         svg.call(zoom);
-        var nanoScrollerSelector = $(this.domElementNano.current);
+        var nanoScrollerSelector = $(this.domElementNano);
         nanoScrollerSelector.nanoScroller();
         inner.call(render, g);
 
         // Zoom and scale to fit
         var graphWidth = g.graph().width + 10;
         var graphHeight = g.graph().height + 10;
-        // var width = parseInt(svg.style("width").replace(/px/, ""));
-        // var height = parseInt(svg.style("height").replace(/px/, ""));
-        var width = this.state.width; //todo: Use correct window sizes from SP
-        var height = this.state.height; //todo: Use correct window sizes from SP
+        var width = this.state.width;
+        var height = this.state.height;
         var zoomScale = Math.min(width / graphWidth, height / graphHeight);
         var translate = [0, 0];
 
         svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity.scale(zoomScale));
         svg.attr('width', width);
         svg.attr('height', height);
-        // svg.select('g').attr('width')
-        // zoom.event(isUpdate ? svg.transition().duration(500) : d3.select("svg"));
-        //zoom.event(svg);
         // todo: Fix zooming for buttons
-        d3.selectAll(this.domElementBtnZoomIn.current).on('click', function () {
+        d3.selectAll(this.domElementBtnZoomIn).on('click', function () {
             zoomScale += 0.05;
             this.interpolateZoom(translate, zoomScale, inner, zoom);
         });
 
-        d3.selectAll(this.domElementBtnZoomOut.current).on('click', function () {
+        d3.selectAll(this.domElementBtnZoomOut).on('click', function () {
             if (zoomScale > 0.05) {
                 zoomScale -= 0.05;
                 this.interpolateZoom(translate, zoomScale, inner, zoom);
@@ -225,7 +208,7 @@ class MessageFlow extends Widget {
 
         });
 
-        d3.selectAll(this.domElementBtnZoomFit.current).on('click', function () {
+        d3.selectAll(this.domElementBtnZoomFit).on('click', function () {
             var zoomScale = Math.min(width / graphWidth, height / graphHeight);
             var translate = [(width / 2) - ((graphWidth * zoomScale) / 2), (height / 2) - ((graphHeight * zoomScale) / 2) * 0.93];
             zoom.translate(translate);
@@ -244,7 +227,7 @@ class MessageFlow extends Widget {
      * @param entryName Name of the component
      * @param pageType Page name required for the message flow drawing
      */
-    extractEntryPointMessageFlowData(timeFrom, timeTo, timeUnit, entryName, tenantId) {
+    drawEntryPointMessageFlowGraph(timeFrom, timeTo, timeUnit, entryName, tenantId) {
 
         // Extract latest configEntry data row from the datastore
         this.setState({
@@ -258,263 +241,6 @@ class MessageFlow extends Widget {
             this.callBackFunction,
             query
         );
-    }
-
-    /**
-     * Message flow data extraction
-     */
-    extractMessageFlow(messageId, meta_tenantId) {
-
-        // Prepare query to read from event stream table
-        let dataProviderConfigs = this.getProviderConf(messageFlowStreamEventDataProviderConf);
-        let query = dataProviderConfigs.configs.config.queryData.query;
-        query = query
-            .replace("{{messageFlowId}}", messageId)
-            .replace("{{meta_tenantId}}", meta_tenantId);
-        dataProviderConfigs.configs.config.queryData.query = query;
-
-        // Query from the table
-        console.log(JSON.stringify(query));
-        super.getWidgetChannelManager().subscribeWidget(
-            this.props.id,
-            this.handleMessageFlowEventStreamData(meta_tenantId).bind(this),
-            query
-        );
-    }
-
-    handleMessageFlowEventStreamData(meta_tenantId) {
-        return function (components) {
-            if (components[0] != null && components[0]["values"] != null) {
-                var entryPointHashCode = components[0]["values"]["entryPointHashcode"];
-                var entryPoint = components[0]["values"]["entryPoint"];
-
-                // Read only one entry from configEntry table
-                let dataProviderConfigs = this.getProviderConf(messageFlowConfigEntryDataProviderConf);
-                let query = dataProviderConfigs.configs.config.queryData.query;
-                query = query
-                    .replace("{{hashcode}}", entryPointHashCode)
-                    .replace("{{meta_tenantId}}", meta_tenantId);
-                dataProviderConfigs.configs.config.queryData.query = query;
-
-                // Query from the table
-                this.super.getWidgetChannelManager().subscribeWidget(
-                    this.props.id,
-                    this.handleMessageFlowConfigEntryData(components).bind(this),
-                    query
-                );
-            }
-            else {
-                // todo: Handle null data scenario
-            }
-        }
-    }
-
-    handleMessageFlowConfigEntryData(components) {
-        return function (config) {
-            // Get all sequence components hashcodes
-            let sequenceHashcodes = [];
-            components.forEach((component) => {
-                if (component[componentInfo] == "Sequence") {
-                    sequenceHashcodes.push(component["hashCode"]);
-                }
-            });
-            let dataProviderConfigs = this.getProviderConf(messageFlowComponentConfigEntryDataProviderConf);
-            let query = dataProviderConfigs.configs.config.queryData.query;
-            query = query
-                .replace("{{hashcodeArray}}", sequenceHashcodes)
-                .replace("{{meta_tenantId}}", meta_tenantId);
-            dataProviderConfigs.configs.config.queryData.query = query;
-
-            // Query from the table
-            this.super.getWidgetChannelManager().subscribeWidget(
-                this.props.id,
-                this.handleMessageFlowComponentConfigEntryData(components, config).bind(this),
-                query
-            );
-        }
-    }
-
-    handleMessageFlowComponentConfigEntryData(components, config) {
-        return function (seqConfigs) {
-            // todo: seqConfigs contain configEntries with hashcodes. Use this data to fix schema injecting
-            var schema = JSON.parse(config["values"]["configData"]);
-
-            // Prepare component map
-            var componentMap = {};
-            if (components != null) {
-                for (var i = 0; i < components.length; i++) {
-                    var component = components[i];
-                    var componentInfo = component["values"];
-
-                    if (componentInfo != null) {
-                        var componentId = componentInfo["componentId"];
-
-                        // get schema of referenced sequences and add it to the overall schema
-                        if ("Sequence" == componentInfo["componentType"]) {
-                            var query = stringify({
-                                "query": "_hashcode : \"" + componentInfo["hashCode"] + "\" AND meta_tenantId : [" + tenantId + " TO " + tenantId + "]",
-                                "start": 0,
-                                "count": 1
-                            });
-                            var seqConfigResp = connector.search(superTenantId, tableName, query);
-                            var seqConfig = JSON.parse(seqConfigResp.getMessage())[0];
-                            if (seqConfig != null) {
-                                var seqSchema = JSON.parse(seqConfig["values"]["configData"]);
-                                for (var j = 0; j < seqSchema.length; j++) {
-                                    schema.push(seqSchema[j]);
-                                }
-                            }
-                        }
-                        componentMap[componentId] = componentInfo;
-                    }
-                }
-            }
-
-            var removedComponents = [];
-            // Populate table data
-            var componentNameRegex = new RegExp("^.*@\\d*:(.*)");
-            var groups = [];
-            var compIds = [];
-            for (var i = 0; i < schema.length; i++) {
-                var groupLabel;
-                if (schema[i] != null) {
-                    var groupId = schema[i]["group"];
-                    var componentId = schema[i]["id"];
-
-                    var isIndirectComponent = componentId.indexOf("@indirect");
-                    var originalCompId = componentId;
-                    if (isIndirectComponent > 0) {
-                        // PaymentServiceEp@14:PaymentServiceEp@indirect --> PaymentServiceEp@0:PaymentServiceEp
-                        var splitByAt = componentId.split("@"); // ["PaymentServiceEp", "14:PaymentServiceEp", "indirect"]
-                        var splitByColon = splitByAt[1].split(":"); // ["14", "PaymentServiceEp"]
-                        componentId = splitByAt[0] + "@0:" + splitByColon[1];
-                        for (var j = 0; j < schema.length; j++) {
-                            if (schema[j] != null) {
-                                var componentIdTmp = schema[j]["id"];
-                                var componentIdParentTmp = schema[j]["parentId"];
-                                var tempGroupId = schema[j]["group"];
-                                if (componentIdTmp == componentId) {
-                                    schema[j]["id"] = originalCompId;
-                                }
-                                if (componentIdParentTmp == componentId) {
-                                    schema[j]["parentId"] = originalCompId;
-                                }
-                                if (tempGroupId == componentId) {
-                                    schema[j]["group"] = originalCompId;
-                                }
-                            }
-                        }
-                    }
-
-                    var componentInfo = null;
-                    if (componentId != null) {
-                        componentInfo = componentMap[componentId];
-                    }
-                    var dataAttributes = [];
-                    var hiddenAttributes = [];
-                    var componentLabel = componentNameRegex.exec(componentId)[1];
-
-                    // Find unique groups
-                    if (schema[i]["group"] != null && groups.indexOf(schema[i]["group"]) == -1) {
-                        groups.push(schema[i]["group"]);
-                    }
-
-
-                    // Create data attributes
-                    if (componentInfo != null) {
-                        dataAttributes.push({"name": "Duration", "value": componentInfo["duration"]});
-                        if (componentInfo["faultCount"] == 0) {
-                            dataAttributes.push({"name": "Status", "value": "Success"});
-                        } else {
-                            dataAttributes.push({"name": "Status", "value": "Failed"});
-                        }
-                        componentType = componentInfo["componentType"];
-                        hashCode = componentInfo["hashCode"];
-
-                        hiddenAttributes.push({"name": "entryPoint", "value": entryPoint});
-                        hiddenAttributes.push({"name": "hashCode", "value": hashCode});
-
-                        // for Sequences and Endpoints, id should be the "name", since name is used for drill down searches
-                        if (componentType == "Endpoint" || componentType == "Sequence") {
-                            hiddenAttributes.push({"name": "id", "value": componentLabel});
-                        } else {
-                            hiddenAttributes.push({"name": "id", "value": componentId});
-                        }
-
-                        var compId = schema[i]["id"];
-                        var parentId = schema[i]["parentId"];
-                        if (compIds.indexOf(compId) < 0) {
-                            compIds.push(compId);
-                        }
-                        if (parentId != null && (compIds.indexOf(parentId) < 0)) {
-                            var matchingParentId;
-
-                            // This logic traverse towards the root of the configuration tree from
-                            // the current node, until it finds the parent of the node or any ancestor node
-                            // exists within the message flow. If any node found, it assigns the node as
-                            // its parent.  This link is used to draw the message flow.
-                            for (var j = 1; j < schema.length; j++) {
-                                if (compIds.indexOf(schema[i - j]["parentId"]) != -1) {
-                                    matchingParentId = schema[i - j]["parentId"];
-                                    break;
-                                }
-                            }
-                            tmpResult.push({
-                                "id": originalCompId,
-                                "label": componentLabel,
-                                "parents": [matchingParentId],
-                                "group": schema[i]["group"],
-                                "type": componentType,
-                                "dataAttributes": dataAttributes,
-                                "hiddenAttributes": hiddenAttributes,
-                                "modifiedId": componentId
-                            });
-                        } else if (schema[i]["parentId"] == schema[i]["group"]) {
-                            tmpResult.push({
-                                "id": originalCompId,
-                                "label": componentLabel,
-                                "parents": [],
-                                "group": schema[i]["group"],
-                                "type": componentType,
-                                "dataAttributes": dataAttributes,
-                                "hiddenAttributes": hiddenAttributes,
-                                "modifiedId": componentId
-                            });
-                        } else {
-                            tmpResult.push({
-                                "id": originalCompId,
-                                "label": componentLabel,
-                                "parents": [schema[i]["parentId"]],
-                                "group": schema[i]["group"],
-                                "type": componentType,
-                                "dataAttributes": dataAttributes,
-                                "hiddenAttributes": hiddenAttributes,
-                                "modifiedId": componentId
-                            });
-                        }
-                    } else {
-                        removedComponents.push(componentId);
-                    }
-                }
-            }
-            compIds = null;
-
-            // Cleanup
-            for (var k = 0; k < tmpResult.length; k++) {
-                var group = tmpResult[k]["group"];
-                var parentId = tmpResult[k]["parents"];
-                if (removedComponents.indexOf(group) == -1 && removedComponents.indexOf(parentId[0]) == -1) {
-                    result.push(tmpResult[k]);
-                }
-            }
-
-
-            for (var j = 0; j < result.length; j++) {
-                if (groups.indexOf(result[j]["id"]) >= 0) {
-                    result[j]["type"] = "group";
-                }
-            }
-        }
     }
 
     getConfigEntryDataProviderConf(entryName, meta_tenantId, timeFrom, timeTo) {
@@ -722,13 +448,332 @@ class MessageFlow extends Widget {
                 }
 
                 // Draw message flow with the processed data
-                // console.log(result);
-                // console.log(JSON.stringify(result));
                 this.drawMessageFlow($, result);
             } else {
                 // todo : handle this no data returned situation
             }
         }
+    }
+
+    /**
+     * Draw graph for a flow of a message using the unique messageFlowID for the message.
+     * @param messageFlowID Unique ID for the message flow
+     * @param tenantId Tenant ID in a multiple tenant scenario
+     */
+    drawMessageFlowGraph(messageFlowID, tenantId) {
+        // Set graph status to blank
+        this.setState({
+            dataUnavailable: true
+        });
+
+        // Set message flow id and make db call
+        super.getWidgetConfiguration(this.props.widgetID)
+            .then((message) => {
+                let dataProviderConf = message.data;
+                var query = dataProviderConf.configs.providerConfig.configs.config.queryData
+                    .MESSAGE_FLOW_QUERY_GET_COMPONENTS;
+                let formattedQuery = query
+                    .replace("{{messageFlowId}}", "\'" + messageFlowID + "\'")
+                    .replace("{{meta_tenantId}}", tenantId);
+                dataProviderConf.configs.providerConfig.configs.config.queryData.query = formattedQuery;
+                super.getWidgetChannelManager()
+                    .subscribeWidget(
+                        this.props.id,
+                        this.handleMessageFlowComponentsData(tenantId).bind(this),
+                        dataProviderConf.configs.providerConfig
+                    );
+            })
+            .catch((error) => {
+                // todo: Handle failure
+            });
+    }
+
+    /**
+     *  Parse message flow components data and get schema for the message flow id
+     */
+    handleMessageFlowComponentsData(tenantId) {
+        return (components) => { // todo : If empty data came from the db, handle that situation
+            let parsedComponents = this.parseDatastoreMessage(components);
+            var entryPointHashCode = parsedComponents[0].entryPointHashcode;
+            var entryPoint = parsedComponents[0].entryPoint;
+
+            // Set query for schema and call datastore for data
+            super.getWidgetConfiguration(this.props.widgetID)
+                .then((message) => {
+                    let dataProviderConf = message.data;
+                    var query = dataProviderConf.configs.providerConfig.configs.config.queryData
+                        .MESSAGE_FLOW_QUERY_GET_FLOW_SCHEMA;
+                    let formattedQuery = query
+                        .replace("{{hashcode}}", "\'" + entryPointHashCode + "\'")
+                        .replace("{{meta_tenantId}}", tenantId);
+                    dataProviderConf.configs.providerConfig.configs.config.queryData.query = formattedQuery;
+                    super.getWidgetChannelManager()
+                        .subscribeWidget(
+                            this.props.id,
+                            this.handleMessageFlowSchema(parsedComponents, entryPoint, tenantId).bind(this),
+                            dataProviderConf.configs.providerConfig
+                        );
+                })
+                .catch((error) => {
+                    // todo: Handle failure
+                });
+        };
+    }
+
+    /**
+     * Parse message flow schema and Get schemas for any existing sequences in the components
+     */
+    handleMessageFlowSchema(parsedComponents, entryPoint, tenantId) {
+        return (flowSchema) => {
+            let parsedFlowScheme = this.parseDatastoreMessage(flowSchema);
+            let sequenceComponentsQuery = "("; // Query for Components which are sequences
+            parsedComponents.forEach((value) => {
+                if (value.componentType === "Sequence") {
+                    // sequenceComponentsQuery += ("hashcode=='" + value.hashCode + "' OR "); // todo: Uncomment this
+                }
+            })
+
+            // If sequences exists
+            if (sequenceComponentsQuery.length > 0) { // todo: Test this scenario with sequence components
+                //sequenceComponentsQuery += "false) "; // To fix final 'OR' in the query
+                sequenceComponentsQuery += "true)"; // todo: Uncomment this
+
+                super.getWidgetConfiguration(this.props.widgetID)
+                    .then((message) => {
+                        let dataProviderConf = message.data;
+                        var query = dataProviderConf.configs.providerConfig.configs.config.queryData
+                            .MESSAGE_FLOW_QUERY_GET_COMPONENT_SCHEMA;
+                        let formattedQuery = query
+                            .replace("{{sequences}}", sequenceComponentsQuery)
+                            .replace("{{meta_tenantId}}", tenantId);
+                        dataProviderConf.configs.providerConfig.configs.config.queryData.query = formattedQuery;
+                        super.getWidgetChannelManager()
+                            .subscribeWidget(
+                                this.props.id,
+                                this.handleMessageFlowComponentSchemas(parsedComponents, entryPoint, parsedFlowScheme).bind(this),
+                                dataProviderConf.configs.providerConfig
+                            );
+                    })
+                    .catch((error) => {
+                        // todo: Handle failure
+                    });
+            }
+            else {
+                this.handleMessageFlowComponentSchemas(parsedComponents, entryPoint, parsedFlowScheme)("");
+            }
+        }
+    }
+
+    /**
+     * Parse message flow schemas for sequence components and replace sequences with proper schemas
+     * to build the message flow data. Then call graph draw function
+     *
+     * @param parsedComponents
+     * @param entryPoint
+     * @param parsedFlowScheme
+     * @returns {Function}
+     */
+    handleMessageFlowComponentSchemas(parsedComponents, entryPoint, flowScheme) {
+        return (sequenceComponents) => {
+            let parsedFlowScheme = JSON.parse(flowScheme[0].configData);
+            let componentMap = {};
+            let parsedSequenceComponents = [];
+            if (sequenceComponents !== ""){
+                parsedSequenceComponents = this.parseDatastoreMessage(sequenceComponents);
+            }
+
+            parsedComponents.forEach((component) => {
+                if (component.componentType === "Sequence") {
+                    // Find this sequence config data from the sequence components
+                    for (let sequence of parsedSequenceComponents) {
+                        if (sequence.hashcode === component.hashCode) {
+                            // For each element in the sequence scheme, push it to the parsed flow scheme
+                            value.configData.forEach((eachScheme) => {
+                                parsedFlowScheme.push(eachScheme);
+                            })
+                            break;
+                        }
+                    }
+                }
+                componentMap[component.componentId] = component;
+            })
+
+            let result = [];
+            let tmpResult = [];
+            // Generate final flow with the extracted data...
+            var removedComponents = [];
+            // Populate table data
+            var componentNameRegex = new RegExp("^.*@\\d*:(.*)");
+            var groups = [];
+            var compIds = [];
+            let schema = parsedFlowScheme;
+            for (var i = 0; i < schema.length; i++) {
+                var groupLabel;
+                if (schema[i] != null) {
+                    var groupId = schema[i]["group"];
+                    var componentId = schema[i]["id"];
+
+                    var isIndirectComponent = componentId.indexOf("@indirect");
+                    var originalCompId = componentId;
+                    if (isIndirectComponent > 0) {
+                        // PaymentServiceEp@14:PaymentServiceEp@indirect --> PaymentServiceEp@0:PaymentServiceEp
+                        var splitByAt = componentId.split("@"); // ["PaymentServiceEp", "14:PaymentServiceEp", "indirect"]
+                        var splitByColon = splitByAt[1].split(":"); // ["14", "PaymentServiceEp"]
+                        componentId = splitByAt[0] + "@0:" + splitByColon[1];
+                        for (var j = 0; j < schema.length; j++) {
+                            if (schema[j] != null) {
+                                var componentIdTmp = schema[j]["id"];
+                                var componentIdParentTmp = schema[j]["parentId"];
+                                var tempGroupId = schema[j]["group"];
+                                if (componentIdTmp == componentId) {
+                                    schema[j]["id"] = originalCompId;
+                                }
+                                if (componentIdParentTmp == componentId){
+                                    schema[j]["parentId"] = originalCompId;
+                                }
+                                if (tempGroupId == componentId) {
+                                    schema[j]["group"] = originalCompId;
+                                }
+                            }
+                        }
+                    }
+
+                    var componentInfo  = null;
+                    if (componentId != null) {
+                        componentInfo = componentMap[componentId];
+                    }
+                    var dataAttributes = [];
+                    var hiddenAttributes = [];
+                    var componentLabel = componentNameRegex.exec(componentId)[1];
+
+                    // Find unique groups
+                    if (schema[i]["group"] != null && groups.indexOf(schema[i]["group"]) == -1) {
+                        groups.push(schema[i]["group"]);
+                    }
+
+
+                    // Create data attributes
+                    if (componentInfo != null) {
+                        dataAttributes.push({"name": "Duration", "value": componentInfo["duration"]});
+                        if (componentInfo["faultCount"] == 0) {
+                            dataAttributes.push({"name": "Status", "value": "Success"});
+                        } else {
+                            dataAttributes.push({"name": "Status", "value": "Failed"});
+                        }
+                        var componentType = componentInfo["componentType"];
+                        var hashCode = componentInfo["hashCode"];
+
+                        hiddenAttributes.push({"name": "entryPoint", "value": entryPoint});
+                        hiddenAttributes.push({"name": "hashCode", "value": hashCode});
+
+                        // for Sequences and Endpoints, id should be the "name", since name is used for drill down searches
+                        if (componentType == "Endpoint" || componentType == "Sequence") {
+                            hiddenAttributes.push({"name": "id", "value": componentLabel});
+                        } else {
+                            hiddenAttributes.push({"name": "id", "value": componentId});
+                        }
+
+                        var compId = schema[i]["id"];
+                        var parentId = schema[i]["parentId"];
+                        if (compIds.indexOf(compId) < 0) {
+                            compIds.push(compId);
+                        }
+                        if (parentId != null && (compIds.indexOf(parentId) < 0)) {
+                            var matchingParentId;
+
+                            // This logic traverse towards the root of the configuration tree from
+                            // the current node, until it finds the parent of the node or any ancestor node
+                            // exists within the message flow. If any node found, it assigns the node as
+                            // its parent.  This link is used to draw the message flow.
+                            for (var j = 1; j < schema.length; j++) {
+                                if (compIds.indexOf(schema[i - j]["parentId"]) != -1) {
+                                    matchingParentId = schema[i - j]["parentId"];
+                                    break;
+                                }
+                            }
+                            tmpResult.push({
+                                "id": originalCompId,
+                                "label": componentLabel,
+                                "parents": [matchingParentId],
+                                "group": schema[i]["group"],
+                                "type": componentType,
+                                "dataAttributes": dataAttributes,
+                                "hiddenAttributes": hiddenAttributes,
+                                "modifiedId": componentId
+                            });
+                        } else if (schema[i]["parentId"] == schema[i]["group"]) {
+                            tmpResult.push({
+                                "id": originalCompId,
+                                "label": componentLabel,
+                                "parents": [],
+                                "group": schema[i]["group"],
+                                "type": componentType,
+                                "dataAttributes": dataAttributes,
+                                "hiddenAttributes": hiddenAttributes,
+                                "modifiedId": componentId
+                            });
+                        } else {
+                            tmpResult.push({
+                                "id": originalCompId,
+                                "label": componentLabel,
+                                "parents": [schema[i]["parentId"]],
+                                "group": schema[i]["group"],
+                                "type": componentType,
+                                "dataAttributes": dataAttributes,
+                                "hiddenAttributes": hiddenAttributes,
+                                "modifiedId": componentId
+                            });
+                        }
+                    } else {
+                        removedComponents.push(componentId);
+                    }
+                }
+            }
+            compIds = null;
+
+            // Cleanup
+            for (var k = 0; k < tmpResult.length; k++) {
+                var group = tmpResult[k]["group"];
+                var parentId = tmpResult[k]["parents"];
+                if (removedComponents.indexOf(group) == -1 && removedComponents.indexOf(parentId[0]) == -1) {
+                    result.push(tmpResult[k]);
+                }
+            }
+
+
+            for (var j = 0; j < result.length; j++) {
+                if (groups.indexOf(result[j]["id"]) >= 0) {
+                    result[j]["type"] = "group";
+                }
+            }
+
+            // Draw graph
+            this.drawMessageFlow($, result);
+        }
+    }
+
+    /**
+     * Parse received data from the data store to a JS object
+     */
+    parseDatastoreMessage(recievedData) {
+        let parsedArray = [];
+        let dataMapper = {};
+
+        let dataArray = recievedData.data;
+        let metaData = recievedData.metadata.names;
+
+        metaData.forEach((value, index) => {
+            dataMapper[index] = value;
+        });
+        dataArray.forEach((dataPoint) => {
+            let parsedObject = {};
+            dataPoint.forEach((value, index) => {
+                parsedObject[dataMapper[index]] = value;
+            });
+            parsedArray.push(parsedObject);
+        })
+
+        return parsedArray;
     }
 
     getProviderConf(aggregatorDataProviderConf) {
@@ -849,12 +894,12 @@ class MessageFlow extends Widget {
             '</div>';
     };
 
-    shouldComponentUpdate() {
-        return true;
-    }
-
     componentWillMount() {
         super.subscribe(this.handleRecievedMessage);
+    }
+
+    componentDidMount() {
+        this.drawMessageFlowGraph("urn_uuid_b4d2bd01-b44c-44c2-83ec-d3ada2c103dc57090651967469", "-1234");
     }
 
     handleMessage(recievedMessage) {
@@ -874,646 +919,30 @@ class MessageFlow extends Widget {
         }
 
         if ("selectedComponent" in message) {
-            this.parameters.entryName = '\'' + message.selectedComponent + '\'';
+            this.parameters.selectedComponantID = '\'' + message.selectedComponent + '\'';
         }
 
-        $(this.domElementSvg.current).empty();
+        $(this.domElementSvg).empty();
 
         if (this.parameters.timeFrom != null
             && this.parameters.timeTo != null
             && this.parameters.timeUnit != null
-            && this.parameters.entryName != null) {
+            && this.parameters.selectedComponantID != null) {
 
-            this.extractEntryPointMessageFlowData(
+            this.drawEntryPointMessageFlowGraph(
                 this.parameters.timeFrom,
                 this.parameters.timeTo,
                 this.parameters.timeUnit,
-                this.parameters.entryName,
+                this.parameters.selectedComponantID,
                 this.parameters.meta_tenantId
             );
         }
     }
 
-    componentDidMount() {
-        // // Sample data
-        // var data = [{
-        //     "id": "HealthcareAPI@0:HealthcareAPI",
-        //     "label": "HealthcareAPI",
-        //     "parents": [],
-        //     "group": null,
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "578.50"
-        //     }, {"name": "MaxDuration", "value": 1060}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@0:HealthcareAPI"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@0:HealthcareAPI"
-        // }, {
-        //     "id": "HealthcareAPI@1:Resource",
-        //     "label": "Resource",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@0:HealthcareAPI",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@1:Resource"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@1:Resource"
-        // }, {
-        //     "id": "HealthcareAPI@2:API_INSEQ",
-        //     "label": "API_INSEQ",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@1:Resource",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@2:API_INSEQ"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@2:API_INSEQ"
-        // }, {
-        //     "id": "HealthcareAPI@3:LogMediator",
-        //     "label": "LogMediator",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@2:API_INSEQ",
-        //     "type": "UNKNOWN",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@3:LogMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@3:LogMediator"
-        // }, {
-        //     "id": "HealthcareAPI@4:SendMediator",
-        //     "label": "SendMediator",
-        //     "parents": ["HealthcareAPI@3:LogMediator"],
-        //     "group": "HealthcareAPI@2:API_INSEQ",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@4:SendMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@4:SendMediator"
-        // }, {
-        //     "id": "QueryDoctorEP@5:QueryDoctorEP@indirect",
-        //     "label": "QueryDoctorEP",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@4:SendMediator",
-        //     "type": "UNKNOWN",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "QueryDoctorEP@0:QueryDoctorEP"
-        //     }],
-        //     "modifiedId": "QueryDoctorEP@0:QueryDoctorEP"
-        // }, {
-        //     "id": "HealthcareAPI@6:API_OUTSEQ",
-        //     "label": "API_OUTSEQ",
-        //     "parents": ["HealthcareAPI@2:API_INSEQ"],
-        //     "group": "HealthcareAPI@1:Resource",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@6:API_OUTSEQ"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@6:API_OUTSEQ"
-        // }, {
-        //     "id": "HealthcareAPI@7:SendMediator",
-        //     "label": "SendMediator",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@6:API_OUTSEQ",
-        //     "type": "UNKNOWN",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@7:SendMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@7:SendMediator"
-        // }, {
-        //     "id": "HealthcareAPI@8:API_FAULTSEQ",
-        //     "label": "API_FAULTSEQ",
-        //     "parents": ["HealthcareAPI@6:API_OUTSEQ"],
-        //     "group": "HealthcareAPI@1:Resource",
-        //     "type": "UNKNOWN",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@8:API_FAULTSEQ"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@8:API_FAULTSEQ"
-        // }, {
-        //     "id": "HealthcareAPI@9:Resource",
-        //     "label": "Resource",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@0:HealthcareAPI",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "572.00"
-        //     }, {"name": "MaxDuration", "value": 1048}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@9:Resource"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@9:Resource"
-        // }, {
-        //     "id": "HealthcareAPI@10:API_INSEQ",
-        //     "label": "API_INSEQ",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@9:Resource",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "570.00"
-        //     }, {"name": "MaxDuration", "value": 1044}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "API_INSEQ"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@10:API_INSEQ"
-        // }, {
-        //     "id": "HealthcareAPI@11:PropertyMediator:Hospital",
-        //     "label": "PropertyMediator:Hospital",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@10:API_INSEQ",
-        //     "type": "Mediator",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "7.00"
-        //     }, {"name": "MaxDuration", "value": 13}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@11:PropertyMediator:Hospital"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@11:PropertyMediator:Hospital"
-        // }, {
-        //     "id": "HealthcareAPI@12:PropertyMediator:card_number",
-        //     "label": "PropertyMediator:card_number",
-        //     "parents": ["HealthcareAPI@11:PropertyMediator:Hospital"],
-        //     "group": "HealthcareAPI@10:API_INSEQ",
-        //     "type": "Mediator",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "0.00"
-        //     }, {"name": "MaxDuration", "value": 5e-324}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@12:PropertyMediator:card_number"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@12:PropertyMediator:card_number"
-        // }, {
-        //     "id": "HealthcareAPI@13:DataMapperMediator",
-        //     "label": "DataMapperMediator",
-        //     "parents": ["HealthcareAPI@12:PropertyMediator:card_number"],
-        //     "group": "HealthcareAPI@10:API_INSEQ",
-        //     "type": "Mediator",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "444.00"
-        //     }, {"name": "MaxDuration", "value": 851}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@13:DataMapperMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@13:DataMapperMediator"
-        // }, {
-        //     "id": "HealthcareAPI@14:SwitchMediator",
-        //     "label": "SwitchMediator",
-        //     "parents": ["HealthcareAPI@13:DataMapperMediator"],
-        //     "group": "HealthcareAPI@10:API_INSEQ",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "137.00"
-        //     }, {"name": "MaxDuration", "value": 212}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@14:SwitchMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@14:SwitchMediator"
-        // }, {
-        //     "id": "HealthcareAPI@15:LogMediator",
-        //     "label": "LogMediator",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@14:SwitchMediator",
-        //     "type": "Mediator",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "1.50"
-        //     }, {"name": "MaxDuration", "value": 2}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@15:LogMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@15:LogMediator"
-        // }, {
-        //     "id": "HealthcareAPI@16:PropertyMediator:uri.var.hospital",
-        //     "label": "PropertyMediator:uri.var.hospital",
-        //     "parents": ["HealthcareAPI@15:LogMediator"],
-        //     "group": "HealthcareAPI@14:SwitchMediator",
-        //     "type": "Mediator",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "17.00"
-        //     }, {"name": "MaxDuration", "value": 32}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@16:PropertyMediator:uri.var.hospital"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@16:PropertyMediator:uri.var.hospital"
-        // }, {
-        //     "id": "HealthcareAPI@17:CallMediator",
-        //     "label": "CallMediator",
-        //     "parents": ["HealthcareAPI@16:PropertyMediator:uri.var.hospital"],
-        //     "group": "HealthcareAPI@14:SwitchMediator",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "66.00"
-        //     }, {"name": "MaxDuration", "value": 115}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@17:CallMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@17:CallMediator"
-        // }, {
-        //     "id": "GrandOakEP@18:GrandOakEP@indirect",
-        //     "label": "GrandOakEP",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@17:CallMediator",
-        //     "type": "Endpoint",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "72.50"
-        //     }, {"name": "MaxDuration", "value": 127}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "GrandOakEP"
-        //     }],
-        //     "modifiedId": "GrandOakEP@0:GrandOakEP"
-        // }, {
-        //     "id": "HealthcareAPI@19:LogMediator",
-        //     "label": "LogMediator",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@14:SwitchMediator",
-        //     "type": "UNKNOWN",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@19:LogMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@19:LogMediator"
-        // }, {
-        //     "id": "HealthcareAPI@20:PropertyMediator:uri.var.hospital",
-        //     "label": "PropertyMediator:uri.var.hospital",
-        //     "parents": ["HealthcareAPI@19:LogMediator"],
-        //     "group": "HealthcareAPI@14:SwitchMediator",
-        //     "type": "UNKNOWN",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@20:PropertyMediator:uri.var.hospital"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@20:PropertyMediator:uri.var.hospital"
-        // }, {
-        //     "id": "HealthcareAPI@21:CallMediator",
-        //     "label": "CallMediator",
-        //     "parents": ["HealthcareAPI@20:PropertyMediator:uri.var.hospital"],
-        //     "group": "HealthcareAPI@14:SwitchMediator",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@21:CallMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@21:CallMediator"
-        // }, {
-        //     "id": "ClemencyEP@22:ClemencyEP@indirect",
-        //     "label": "ClemencyEP",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@21:CallMediator",
-        //     "type": "UNKNOWN",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "ClemencyEP@0:ClemencyEP"
-        //     }],
-        //     "modifiedId": "ClemencyEP@0:ClemencyEP"
-        // }, {
-        //     "id": "HealthcareAPI@23:LogMediator",
-        //     "label": "LogMediator",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@14:SwitchMediator",
-        //     "type": "UNKNOWN",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@23:LogMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@23:LogMediator"
-        // }, {
-        //     "id": "HealthcareAPI@24:PropertyMediator:uri.var.hospital",
-        //     "label": "PropertyMediator:uri.var.hospital",
-        //     "parents": ["HealthcareAPI@23:LogMediator"],
-        //     "group": "HealthcareAPI@14:SwitchMediator",
-        //     "type": "UNKNOWN",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@24:PropertyMediator:uri.var.hospital"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@24:PropertyMediator:uri.var.hospital"
-        // }, {
-        //     "id": "HealthcareAPI@25:CallMediator",
-        //     "label": "CallMediator",
-        //     "parents": ["HealthcareAPI@24:PropertyMediator:uri.var.hospital"],
-        //     "group": "HealthcareAPI@14:SwitchMediator",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@25:CallMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@25:CallMediator"
-        // }, {
-        //     "id": "PineValleyEP@26:PineValleyEP@indirect",
-        //     "label": "PineValleyEP",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@25:CallMediator",
-        //     "type": "UNKNOWN",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "PineValleyEP@0:PineValleyEP"
-        //     }],
-        //     "modifiedId": "PineValleyEP@0:PineValleyEP"
-        // }, {
-        //     "id": "HealthcareAPI@27:PropertyMediator:uri.var.appointment_id",
-        //     "label": "PropertyMediator:uri.var.appointment_id",
-        //     "parents": ["HealthcareAPI@14:SwitchMediator"],
-        //     "group": "HealthcareAPI@10:API_INSEQ",
-        //     "type": "Mediator",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "11.00"
-        //     }, {"name": "MaxDuration", "value": 19}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@27:PropertyMediator:uri.var.appointment_id"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@27:PropertyMediator:uri.var.appointment_id"
-        // }, {
-        //     "id": "HealthcareAPI@28:PropertyMediator:doctor_details",
-        //     "label": "PropertyMediator:doctor_details",
-        //     "parents": ["HealthcareAPI@27:PropertyMediator:uri.var.appointment_id"],
-        //     "group": "HealthcareAPI@10:API_INSEQ",
-        //     "type": "Mediator",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "4.00"
-        //     }, {"name": "MaxDuration", "value": 6}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@28:PropertyMediator:doctor_details"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@28:PropertyMediator:doctor_details"
-        // }, {
-        //     "id": "HealthcareAPI@29:PropertyMediator:patient_details",
-        //     "label": "PropertyMediator:patient_details",
-        //     "parents": ["HealthcareAPI@28:PropertyMediator:doctor_details"],
-        //     "group": "HealthcareAPI@10:API_INSEQ",
-        //     "type": "Mediator",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "7.50"
-        //     }, {"name": "MaxDuration", "value": 13}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@29:PropertyMediator:patient_details"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@29:PropertyMediator:patient_details"
-        // }, {
-        //     "id": "HealthcareAPI@30:CallMediator",
-        //     "label": "CallMediator",
-        //     "parents": ["HealthcareAPI@29:PropertyMediator:patient_details"],
-        //     "group": "HealthcareAPI@10:API_INSEQ",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "6.50"
-        //     }, {"name": "MaxDuration", "value": 12}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@30:CallMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@30:CallMediator"
-        // }, {
-        //     "id": "ChannelingFeeEP@31:ChannelingFeeEP@indirect",
-        //     "label": "ChannelingFeeEP",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@30:CallMediator",
-        //     "type": "Endpoint",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "10.00"
-        //     }, {"name": "MaxDuration", "value": 12}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "ChannelingFeeEP"
-        //     }],
-        //     "modifiedId": "ChannelingFeeEP@0:ChannelingFeeEP"
-        // }, {
-        //     "id": "HealthcareAPI@32:PropertyMediator:actual_fee",
-        //     "label": "PropertyMediator:actual_fee",
-        //     "parents": ["HealthcareAPI@30:CallMediator"],
-        //     "group": "HealthcareAPI@10:API_INSEQ",
-        //     "type": "Mediator",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "1.00"
-        //     }, {"name": "MaxDuration", "value": 1}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@32:PropertyMediator:actual_fee"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@32:PropertyMediator:actual_fee"
-        // }, {
-        //     "id": "HealthcareAPI@33:PayloadFactoryMediator",
-        //     "label": "PayloadFactoryMediator",
-        //     "parents": ["HealthcareAPI@32:PropertyMediator:actual_fee"],
-        //     "group": "HealthcareAPI@10:API_INSEQ",
-        //     "type": "Mediator",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "4.00"
-        //     }, {"name": "MaxDuration", "value": 6}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@33:PayloadFactoryMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@33:PayloadFactoryMediator"
-        // }, {
-        //     "id": "HealthcareAPI@34:CallMediator",
-        //     "label": "CallMediator",
-        //     "parents": ["HealthcareAPI@33:PayloadFactoryMediator"],
-        //     "group": "HealthcareAPI@10:API_INSEQ",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "2.00"
-        //     }, {"name": "MaxDuration", "value": 2}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@34:CallMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@34:CallMediator"
-        // }, {
-        //     "id": "SettlePaymentEP@35:SettlePaymentEP@indirect",
-        //     "label": "SettlePaymentEP",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@34:CallMediator",
-        //     "type": "Endpoint",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "10.00"
-        //     }, {"name": "MaxDuration", "value": 12}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "SettlePaymentEP"
-        //     }],
-        //     "modifiedId": "SettlePaymentEP@0:SettlePaymentEP"
-        // }, {
-        //     "id": "HealthcareAPI@36:RespondMediator",
-        //     "label": "RespondMediator",
-        //     "parents": ["HealthcareAPI@34:CallMediator"],
-        //     "group": "HealthcareAPI@10:API_INSEQ",
-        //     "type": "Mediator",
-        //     "dataAttributes": [{"name": "Invocations", "value": 2}, {
-        //         "name": "AvgDuration",
-        //         "value": "5.50"
-        //     }, {"name": "MaxDuration", "value": 10}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@36:RespondMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@36:RespondMediator"
-        // }, {
-        //     "id": "HealthcareAPI@37:API_OUTSEQ",
-        //     "label": "API_OUTSEQ",
-        //     "parents": ["HealthcareAPI@10:API_INSEQ"],
-        //     "group": "HealthcareAPI@9:Resource",
-        //     "type": "group",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@37:API_OUTSEQ"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@37:API_OUTSEQ"
-        // }, {
-        //     "id": "HealthcareAPI@38:SendMediator",
-        //     "label": "SendMediator",
-        //     "parents": [],
-        //     "group": "HealthcareAPI@37:API_OUTSEQ",
-        //     "type": "UNKNOWN",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@38:SendMediator"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@38:SendMediator"
-        // }, {
-        //     "id": "HealthcareAPI@39:API_FAULTSEQ",
-        //     "label": "API_FAULTSEQ",
-        //     "parents": ["HealthcareAPI@37:API_OUTSEQ"],
-        //     "group": "HealthcareAPI@9:Resource",
-        //     "type": "UNKNOWN",
-        //     "dataAttributes": [{"name": "Invocations", "value": 0}, {
-        //         "name": "TotalDuration",
-        //         "value": 0
-        //     }, {"name": "MaxDuration", "value": 0}, {"name": "Faults", "value": 0}],
-        //     "hiddenAttributes": [{"name": "entryPoint", "value": "HealthcareAPI"}, {
-        //         "name": "id",
-        //         "value": "HealthcareAPI@39:API_FAULTSEQ"
-        //     }],
-        //     "modifiedId": "HealthcareAPI@39:API_FAULTSEQ"
-        // }];
-        //
-        // // Draw the message flow with the received data
-        // this.drawMessageFlow($, data);
-
-        // Extract message flow data from the data store for PROXY and API
-        // this.extractEntryPointMessageFlowData(
-        //     this.parameters.timeFrom,
-        //     this.parameters.timeTo,
-        //     this.parameters.timeUnit,
-        //     this.parameters.entryName,
-        //     this.parameters.meta_tenantId
-        // );
-    }
-
     noParameters() {
         var page = this.getCurrentPage();
-        switch (page.name) {
+        let pageName = page == null ? '' : page.name;
+        switch (pageName) {
             case 'api':
                 return 'Please select an API and a valid date range to view stats.';
                 break;
@@ -1536,7 +965,7 @@ class MessageFlow extends Widget {
     }
 
     getCurrentPage() {
-        var page, pageName;
+        var pageName;
         var href = parent.window.location.href;
         var lastSegment = href.substr(href.lastIndexOf('/') + 1);
         if (lastSegment.indexOf('?') === -1) {
@@ -1544,25 +973,30 @@ class MessageFlow extends Widget {
         } else {
             pageName = lastSegment.substr(0, lastSegment.indexOf('?'));
         }
-        return getGadgetConfig(pageName);
+        return pageName;
     };
 
     render() {
         return (
             <body>
-            <div className="nano" ref={this.domElementNano}>
+            <div className="nano" ref={input => (this.domElementNano = input)}>
                 <div className="nano-content">
                     <div className="page-content-wrapper">
                         <div className="zoom-panel">
-                            <button className="btn-zoom" id="btnZoomIn" ref={this.domElementBtnZoomIn}>+</button>
+                            <button className="btn-zoom" id="btnZoomIn"
+                                    ref={input => (this.domElementBtnZoomIn = input)}>+
+                            </button>
                             <br/>
-                            <button className="btn-zoom" id="btnZoomOut" ref={this.domElementBtnZoomOut}>-</button>
+                            <button className="btn-zoom" id="btnZoomOut"
+                                    ref={input => (this.domElementBtnZoomOut = input)}>-
+                            </button>
                             <br/>
-                            <button className="btn-zoom" id="btnZoomFit" ref={this.domElementBtnZoomFit}>
+                            <button className="btn-zoom" id="btnZoomFit"
+                                    ref={input => (this.domElementBtnZoomFit = input)}>
                                 <i className="fw fw-square-outline"></i>
                             </button>
                         </div>
-                        <div id="canvas" ref={this.domElementCanvas}>
+                        <div id="canvas" ref={input => (this.domElementCanvas = input)}>
                             {this.state.dataUnavailable === true ?
                                 <div class="status-message">
                                     <div class="message message-info">
@@ -1572,7 +1006,8 @@ class MessageFlow extends Widget {
                                     </div>
                                 </div> : null}
                         </div>
-                        <svg id="svg-canvas" width="100%" height="100%" ref={this.domElementSvg}></svg>
+                        <svg id="svg-canvas" width="100%" height="100%"
+                             ref={input => (this.domElementSvg = input)}></svg>
                     </div>
                 </div>
             </div>
@@ -1587,15 +1022,5 @@ function getDashboardBaseUrl() {
     var tenantBaseUrl = BaseUrlRegex.exec(currentUrl)[1];
     return "/" + tenantBaseUrl + "/" + DASHBOARD_NAME + "/";
 }
-
-function getGadgetConfig(typeName) {
-    var config = null;
-    configs.forEach(function (item, i) {
-        if (item.name === typeName) {
-            config = item;
-        }
-    });
-    return config;
-};
 
 global.dashboard.registerWidget('MessageFlow', MessageFlow);

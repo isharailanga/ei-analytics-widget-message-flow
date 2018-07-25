@@ -1,3 +1,4 @@
+
 {
   "name": "MessageFlow",
   "id": "MessageFlow",
@@ -7,6 +8,21 @@
       "types": [
         "subscriber"
       ]
+    },
+    "providerConfig": {
+      "configs" : {
+        "type": "SiddhiStoreDataProvider",
+        "config": {
+          "siddhiApp": "@store(type = 'rdbms', datasource = 'EI_ANALYTICS') define table esbEventStream (meta_tenantId int, messageFlowId string, host string, hashCode string, componentName string, componentType string, componentIndex int, componentId string, startTime long, endTime long, duration long, beforePayload string, afterPayload string, contextPropertyMap string, transportPropertyMap string, children string, entryPoint string, entryPointHashcode string, faultCount int, _timestamp long); @store(type = 'rdbms', datasource = 'EI_ANALYTICS') define table configEntry (meta_tenantId int, hashcode string, entryName string, configData string, _timestamp long)",
+          "queryData": {
+            "query": "",
+            "MESSAGE_FLOW_QUERY_GET_COMPONENTS": "from esbEventStream on messageFlowId=={{messageFlowId}} AND meta_tenantId=={{meta_tenantId}} select *",
+            "MESSAGE_FLOW_QUERY_GET_FLOW_SCHEMA": "from configEntry on hashcode=={{hashcode}} AND meta_tenantId=={{meta_tenantId}} select configData limit 1",
+            "MESSAGE_FLOW_QUERY_GET_COMPONENT_SCHEMA": "from configEntry on {{sequences}} AND meta_tenantId=={{meta_tenantId}} select configData, hashcode"
+          },
+          "publishingInterval": 60
+        }
+      }
     }
   }
 }

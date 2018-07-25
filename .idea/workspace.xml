@@ -1,0 +1,857 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="6611367e-e4c3-4fc2-885d-f3de7f347679" name="Default" comment="First Commit">
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/MessageFlow.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/MessageFlow.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/css/bootstrap.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/css/font-awesome.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/fonts/FontAwesome.otf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/fonts/fontawesome-webfont.eot" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/fonts/fontawesome-webfont.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/fonts/fontawesome-webfont.ttf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/fonts/fontawesome-webfont.woff" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/fonts/fontawesome-webfont.woff2" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/resources/aggregatorDataProviderConf.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/resources/aggregatorDataProviderConf.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/resources/messageFlowStreamEventDataProviderConf.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/resources/widgetConf.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/resources/widgetConf.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webpack.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/webpack.config.js" afterDir="false" />
+    </list>
+    <ignored path="$PROJECT_DIR$/dist/MessageFlow/" />
+    <ignored path="$PROJECT_DIR$/.tmp/" />
+    <ignored path="$PROJECT_DIR$/temp/" />
+    <ignored path="$PROJECT_DIR$/tmp/" />
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="TRACKING_ENABLED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileEditorManager">
+    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
+      <file leaf-file-name="widgetConf.json" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/resources/widgetConf.json">
+          <provider selected="true" editor-type-id="text-editor">
+            <state>
+              <caret lean-forward="true" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="MessageFlow.jsx" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/src/MessageFlow.jsx">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="2966">
+              <caret line="449" column="60" selection-start-line="449" selection-start-column="60" selection-end-line="449" selection-end-column="60" />
+              <folding>
+                <element signature="e#0#26#0" expanded="true" />
+                <element signature="n#!!block;n#constructor#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#handleResize#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#drawMessageFlow#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#getConfigEntryDataProviderConf#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#getAggregateDataProviderConf#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#drawMessageFlowGraph#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#getEntryPointSchema#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#getSequenceSchema#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#combineAndDrawMessageFlow#0;n#MessageFlow#0" />
+                <element signature="e#26283#32951#0" />
+                <element signature="e#33059#33356#0" />
+                <element signature="e#33411#33553#0" />
+                <element signature="n#!!block;n#parseDatastoreMessage#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#getProviderConf#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#detectIE#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#buildLabel#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#interpolateZoom#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#isParent#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#getEmptyRecordsText#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#componentWillMount#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#componentDidMount#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#handleMessage#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#noParameters#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#getCurrentPage#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#render#0;n#MessageFlow#0" />
+                <element signature="n#!!block;n#getDashboardBaseUrl#0" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="package.json" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/package.json">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="304">
+              <caret line="16" column="6" selection-start-line="16" selection-start-column="6" selection-end-line="16" selection-end-column="6" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="scratch_2.js" pinned="false" current-in-tab="false">
+        <entry file="file://$APPLICATION_CONFIG_DIR$/scratches/scratch_2.js">
+          <provider selected="true" editor-type-id="text-editor">
+            <state>
+              <caret column="1" selection-end-column="169" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="aggregatorDataProviderConf.json" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/resources/aggregatorDataProviderConf.json">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="209">
+              <caret line="11" column="1" selection-start-line="11" selection-start-column="1" selection-end-line="11" selection-end-column="1" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="configEntryDataProviderConf.json" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/resources/configEntryDataProviderConf.json">
+          <provider selected="true" editor-type-id="text-editor">
+            <state>
+              <caret column="1" lean-forward="true" selection-start-column="1" selection-end-column="1" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+    </leaf>
+  </component>
+  <component name="FindInProjectRecents">
+    <findStrings>
+      <find>(configEntryDataTableIndex\[).*\]</find>
+      <find>aggregateDataTableIndex</find>
+      <find>entryName</find>
+      <find>log</find>
+      <find>av</find>
+      <find>Invocations</find>
+      <find>=</find>
+      <find>==</find>
+      <find>!=</find>
+      <find>this.Se</find>
+      <find>getEmptyRecordsText</find>
+      <find>.empty()</find>
+      <find>imgFolderPath</find>
+      <find>nopa</find>
+      <find>domElementCanvas</find>
+      <find>al</find>
+      <find>componentDid</find>
+      <find>.current</find>
+      <find>this.domElement</find>
+      <find>image</find>
+      <find>icon</find>
+      <find>width</find>
+      <find>react</find>
+      <find>externals</find>
+      <find>handleAggregateData</find>
+      <find>nullEntryPointStatPerQuery</find>
+      <find>componentWill</find>
+      <find>wil</find>
+      <find>hashcode</find>
+      <find>componentwill</find>
+    </findStrings>
+    <replaceStrings>
+      <replace />
+    </replaceStrings>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="IdeDocumentHistory">
+    <option name="CHANGED_PATHS">
+      <list>
+        <option value="$PROJECT_DIR$/src/font-awesome.css" />
+        <option value="$PROJECT_DIR$/.gitignore" />
+        <option value="$PROJECT_DIR$/src/custom.css" />
+        <option value="$PROJECT_DIR$/src/utils/WidgetChannelManager.js" />
+        <option value="$PROJECT_DIR$/src/resources/dataProviderConf.json" />
+        <option value="$PROJECT_DIR$/src/resources/messageFlowStreamEventDataProviderConf.json" />
+        <option value="$APPLICATION_CONFIG_DIR$/scratches/scratch.js" />
+        <option value="$PROJECT_DIR$/webpack.config.js" />
+        <option value="$PROJECT_DIR$/package.json" />
+        <option value="$PROJECT_DIR$/src/resources/aggregatorDataProviderConf.json" />
+        <option value="$PROJECT_DIR$/src/resources/configEntryDataProviderConf.json" />
+        <option value="$APPLICATION_CONFIG_DIR$/scratches/scratch_2.js" />
+        <option value="$PROJECT_DIR$/src/resources/widgetConf.json" />
+        <option value="$PROJECT_DIR$/src/MessageFlow.jsx" />
+      </list>
+    </option>
+  </component>
+  <component name="JsBuildToolGruntFileManager" detection-done="true" sorting="DEFINITION_ORDER" />
+  <component name="JsBuildToolPackageJson" detection-done="true" sorting="DEFINITION_ORDER">
+    <package-json value="$PROJECT_DIR$/package.json" />
+  </component>
+  <component name="JsGulpfileManager">
+    <detection-done>true</detection-done>
+    <sorting>DEFINITION_ORDER</sorting>
+  </component>
+  <component name="NodeModulesDirectoryManager">
+    <handled-path value="$PROJECT_DIR$/node_modules" />
+  </component>
+  <component name="NodePackageJsonFileManager">
+    <packageJsonPaths>
+      <path value="$PROJECT_DIR$/package.json" />
+    </packageJsonPaths>
+  </component>
+  <component name="ProjectFrameBounds" extendedState="6">
+    <option name="x" value="616" />
+    <option name="y" value="24" />
+    <option name="width" value="1304" />
+    <option name="height" value="1056" />
+  </component>
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectView">
+    <navigator proportions="" version="1">
+      <foldersAlwaysOnTop value="true" />
+    </navigator>
+    <panes>
+      <pane id="ProjectPane">
+        <subPane>
+          <expand>
+            <path>
+              <item name="MessageFlow" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MessageFlow" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="MessageFlow" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MessageFlow" type="462c0819:PsiDirectoryNode" />
+              <item name="dist" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="MessageFlow" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MessageFlow" type="462c0819:PsiDirectoryNode" />
+              <item name="src" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="MessageFlow" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MessageFlow" type="462c0819:PsiDirectoryNode" />
+              <item name="src" type="462c0819:PsiDirectoryNode" />
+              <item name="resources" type="462c0819:PsiDirectoryNode" />
+            </path>
+          </expand>
+          <select />
+        </subPane>
+      </pane>
+      <pane id="Scope" />
+    </panes>
+  </component>
+  <component name="PropertiesComponent">
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="com.intellij.ide.scratch.LRUPopupBuilder$1/New Scratch File" value="JavaScript" />
+    <property name="last_opened_file_path" value="$USER_HOME$/Desktop/temp/ei-analytics-widget-search-box" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="nodejs_npm_path_reset_for_default_project" value="true" />
+    <property name="nodejs_package_manager_path" value="npm" />
+    <property name="settings.editor.selected.configurable" value="editor.preferences.fonts.default" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src/resources" />
+      <recent name="$PROJECT_DIR$/src" />
+      <recent name="$PROJECT_DIR$/node_modules/gadget-util" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src" />
+      <recent name="$PROJECT_DIR$/src/resources/css" />
+    </key>
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="RunManager">
+    <configuration name="build-dev" type="js.build_tools.npm" factoryName="npm">
+      <package-json value="$PROJECT_DIR$/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="build-dev" />
+      </scripts>
+      <node-interpreter value="project" />
+      <envs />
+    </configuration>
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="6611367e-e4c3-4fc2-885d-f3de7f347679" name="Default" comment="" />
+      <created>1530190777328</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1530190777328</updated>
+      <workItem from="1530190779913" duration="13243000" />
+      <workItem from="1530257738380" duration="1501000" />
+      <workItem from="1530367182756" duration="763000" />
+      <workItem from="1530455357788" duration="599000" />
+      <workItem from="1530457482807" duration="812000" />
+      <workItem from="1530538590094" duration="138940000" />
+      <workItem from="1531134598152" duration="11567000" />
+      <workItem from="1531228967727" duration="31325000" />
+      <workItem from="1531905535695" duration="4088000" />
+      <workItem from="1532319008998" duration="4370000" />
+      <workItem from="1532347449636" duration="13284000" />
+      <workItem from="1532441361438" duration="2373000" />
+      <workItem from="1532444002447" duration="27050000" />
+    </task>
+    <task id="LOCAL-00001" summary="First Commit">
+      <created>1530606585712</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1530606585712</updated>
+    </task>
+    <task id="LOCAL-00002" summary="First Commit">
+      <created>1530739335853</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1530739335853</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Generate message flow for a given entryName,time-range">
+      <created>1531030788912</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1531030788912</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Inter widget communication and code refactor">
+      <created>1531408695728</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1531408695729</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
+    <servers />
+  </component>
+  <component name="TimeTrackingManager">
+    <option name="totallyTimeSpent" value="249915000" />
+  </component>
+  <component name="ToolWindowManager">
+    <frame x="65" y="-4" width="1855" height="1084" extended-state="6" />
+    <editor active="true" />
+    <layout>
+      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.4984756" weight="0.15148248" />
+      <window_info anchor="bottom" id="TODO" order="6" />
+      <window_info anchor="bottom" id="Docker" order="7" show_stripe_button="false" />
+      <window_info anchor="bottom" id="Event Log" order="7" sideWeight="0.33584905" side_tool="true" weight="0.32991803" />
+      <window_info anchor="bottom" id="Run" order="2" sideWeight="0.49973047" weight="0.32889345" />
+      <window_info id="npm" order="2" sideWeight="0.5015244" side_tool="true" weight="0.13530998" />
+      <window_info anchor="bottom" id="Version Control" order="7" weight="0.32991803" />
+      <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
+      <window_info anchor="bottom" id="Terminal" order="7" sideWeight="0.66415095" weight="0.31967214" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.39959016" />
+      <window_info id="Favorites" order="2" side_tool="true" />
+      <window_info anchor="bottom" id="TypeScript" order="8" />
+      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
+      <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
+      <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
+      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
+      <window_info anchor="bottom" id="Message" order="0" />
+      <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
+      <window_info anchor="bottom" id="Find" order="1" sideWeight="0.49973047" weight="0.27953586" />
+    </layout>
+    <layout-to-restore>
+      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
+      <window_info anchor="bottom" id="Docker" order="7" show_stripe_button="false" />
+      <window_info id="npm" order="2" sideWeight="0.5015244" side_tool="true" weight="0.13530998" />
+      <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
+      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
+      <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.4984756" visible="true" weight="0.15148248" />
+      <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
+      <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
+      <window_info anchor="bottom" id="TODO" order="6" />
+      <window_info anchor="bottom" id="TypeScript" order="11" />
+      <window_info anchor="bottom" id="Run" order="2" sideWeight="0.49973047" weight="0.32889345" />
+      <window_info anchor="bottom" id="Find" order="1" sideWeight="0.49973047" weight="0.27953586" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.39959016" />
+      <window_info anchor="bottom" id="Terminal" order="8" sideWeight="0.66415095" visible="true" weight="0.31967214" />
+      <window_info anchor="bottom" id="Event Log" order="9" sideWeight="0.33584905" side_tool="true" weight="0.32991803" />
+      <window_info anchor="bottom" id="Version Control" order="10" weight="0.32991803" />
+      <window_info anchor="bottom" id="Message" order="0" />
+      <window_info id="Favorites" order="3" side_tool="true" />
+    </layout-to-restore>
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="1" />
+  </component>
+  <component name="VcsContentAnnotationSettings">
+    <option name="myLimit" value="2678400000" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="First Commit" />
+    <MESSAGE value="Generate message flow for a given entryName,time-range" />
+    <MESSAGE value="Inter widget communication and code refactor" />
+    <option name="LAST_COMMIT_MESSAGE" value="Inter widget communication and code refactor" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <option name="time" value="28" />
+    </breakpoint-manager>
+  </component>
+  <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/src/resources/widgetConf.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="209">
+          <caret line="11" column="1" selection-start-line="11" selection-start-column="1" selection-end-line="11" selection-end-column="1" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/resources/messageFlowStreamEventDataProviderConf.json" />
+    <entry file="file://$PROJECT_DIR$/src/resources/configEntryDataProviderConf.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="114">
+          <caret line="6" column="62" selection-start-line="6" selection-start-column="62" selection-end-line="6" selection-end-column="62" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/resources/aggregatorDataProviderConf.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="209">
+          <caret line="11" selection-start-line="11" selection-end-line="11" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/package.json">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/dagre-d3/lib/render.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2679">
+          <caret line="141" column="29" selection-start-line="141" selection-start-column="29" selection-end-line="141" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/package.json">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/MessageFlow.jsx">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="247">
+          <caret line="70" lean-forward="true" selection-start-line="70" selection-end-line="70" />
+          <folding>
+            <element signature="e#0#26#0" expanded="true" />
+            <element signature="n#!!block;n#constructor#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#handleResize#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#drawMessageFlow#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getConfigEntryDataProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getAggregateDataProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#drawMessageFlowGraph#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getEntryPointSchema#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getSequenceSchema#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#combineAndDrawMessageFlow#0;n#MessageFlow#0" />
+            <element signature="e#26283#32951#0" />
+            <element signature="e#33059#33356#0" />
+            <element signature="e#33411#33553#0" />
+            <element signature="n#!!block;n#parseDatastoreMessage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#detectIE#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#buildLabel#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#interpolateZoom#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#isParent#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getEmptyRecordsText#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#componentWillMount#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#componentDidMount#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#handleMessage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#noParameters#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getCurrentPage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#render#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getDashboardBaseUrl#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/dagre-d3/lib/render.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2679">
+          <caret line="141" column="29" selection-start-line="141" selection-start-column="29" selection-end-line="141" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/package.json">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/MessageFlow.jsx">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="247">
+          <caret line="70" lean-forward="true" selection-start-line="70" selection-end-line="70" />
+          <folding>
+            <element signature="e#0#26#0" expanded="true" />
+            <element signature="n#!!block;n#constructor#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#handleResize#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#drawMessageFlow#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getConfigEntryDataProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getAggregateDataProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#drawMessageFlowGraph#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getEntryPointSchema#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getSequenceSchema#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#combineAndDrawMessageFlow#0;n#MessageFlow#0" />
+            <element signature="e#26283#32951#0" />
+            <element signature="e#33059#33356#0" />
+            <element signature="e#33411#33553#0" />
+            <element signature="n#!!block;n#parseDatastoreMessage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#detectIE#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#buildLabel#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#interpolateZoom#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#isParent#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getEmptyRecordsText#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#componentWillMount#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#componentDidMount#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#handleMessage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#noParameters#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getCurrentPage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#render#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getDashboardBaseUrl#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/dagre-d3/lib/render.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1178">
+          <caret line="141" column="29" selection-start-line="141" selection-start-column="29" selection-end-line="141" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/package.json">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/MessageFlow.jsx">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="247">
+          <caret line="70" lean-forward="true" selection-start-line="70" selection-end-line="70" />
+          <folding>
+            <element signature="e#0#26#0" expanded="true" />
+            <element signature="n#!!block;n#constructor#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#handleResize#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#drawMessageFlow#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getConfigEntryDataProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getAggregateDataProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#drawMessageFlowGraph#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getEntryPointSchema#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getSequenceSchema#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#combineAndDrawMessageFlow#0;n#MessageFlow#0" />
+            <element signature="e#26283#32951#0" />
+            <element signature="e#33059#33356#0" />
+            <element signature="e#33411#33553#0" />
+            <element signature="n#!!block;n#parseDatastoreMessage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#detectIE#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#buildLabel#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#interpolateZoom#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#isParent#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getEmptyRecordsText#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#componentWillMount#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#componentDidMount#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#handleMessage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#noParameters#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getCurrentPage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#render#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getDashboardBaseUrl#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/dagre-d3/lib/render.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1178">
+          <caret line="141" column="29" selection-start-line="141" selection-start-column="29" selection-end-line="141" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/package.json">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/MessageFlow.jsx">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1387">
+          <caret line="76" column="5" lean-forward="true" selection-start-line="6" selection-start-column="4" selection-end-line="76" selection-end-column="5" />
+          <folding>
+            <element signature="e#0#26#0" expanded="true" />
+            <element signature="n#!!block;n#constructor#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#handleResize#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#drawMessageFlow#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getConfigEntryDataProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getAggregateDataProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#drawMessageFlowGraph#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getEntryPointSchema#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getSequenceSchema#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#combineAndDrawMessageFlow#0;n#MessageFlow#0" />
+            <element signature="e#26283#32951#0" />
+            <element signature="e#33059#33356#0" />
+            <element signature="e#33411#33553#0" />
+            <element signature="n#!!block;n#parseDatastoreMessage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#detectIE#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#buildLabel#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#interpolateZoom#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#isParent#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getEmptyRecordsText#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#componentWillMount#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#componentDidMount#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#handleMessage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#noParameters#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getCurrentPage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#render#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getDashboardBaseUrl#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/MessageFlow.jsx">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1444">
+          <caret line="76" column="5" lean-forward="true" selection-start-line="76" selection-start-column="5" selection-end-line="76" selection-end-column="5" />
+          <folding>
+            <element signature="e#0#26#0" expanded="true" />
+            <element signature="n#!!block;n#constructor#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#handleResize#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#drawMessageFlow#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getConfigEntryDataProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getAggregateDataProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#drawMessageFlowGraph#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getEntryPointSchema#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getSequenceSchema#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#combineAndDrawMessageFlow#0;n#MessageFlow#0" />
+            <element signature="e#26283#32951#0" />
+            <element signature="e#33059#33356#0" />
+            <element signature="e#33411#33553#0" />
+            <element signature="n#!!block;n#parseDatastoreMessage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#detectIE#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#buildLabel#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#interpolateZoom#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#isParent#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getEmptyRecordsText#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#componentWillMount#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#componentDidMount#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#handleMessage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#noParameters#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getCurrentPage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#render#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getDashboardBaseUrl#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/dagre-d3/lib/render.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1178">
+          <caret line="141" column="29" selection-start-line="141" selection-start-column="29" selection-end-line="141" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/package.json">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/d3/build/d3.js" />
+    <entry file="file://$PROJECT_DIR$/node_modules/dagre-d3/dist/dagre-d3.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="224">
+          <caret line="24" column="2" selection-start-line="24" selection-start-column="2" selection-end-line="24" selection-end-column="2" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/dagre-d3/dist/dagre-d3.core.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state>
+          <caret column="304" selection-start-column="304" selection-end-column="304" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/d3/index.js">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/dagre-d3/index.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="494">
+          <caret line="26" column="2" selection-start-line="26" selection-start-column="2" selection-end-line="26" selection-end-column="2" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/dagre-d3/lib/render.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2679">
+          <caret line="141" column="29" selection-start-line="141" selection-start-column="29" selection-end-line="141" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/gadget-util/gadget-utils.js" />
+    <entry file="file://$PROJECT_DIR$/node_modules/nanoscroller/bin/javascripts/jquery.nanoscroller.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="209">
+          <caret line="932" column="2" selection-start-line="932" selection-start-column="2" selection-end-line="932" selection-end-column="2" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/css/bootstrap.css" />
+    <entry file="file://$PROJECT_DIR$/src/css/font-awesome.css" />
+    <entry file="file://$PROJECT_DIR$/.gitignore">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="76">
+          <caret line="4" column="4" selection-start-line="4" selection-start-column="4" selection-end-line="4" selection-end-column="4" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/font-awesome.css">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="209">
+          <caret line="11" column="21" selection-start-line="11" selection-start-column="21" selection-end-line="11" selection-end-column="21" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/custom.css">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="499">
+          <caret line="161" column="1" selection-start-line="161" selection-start-column="1" selection-end-line="161" selection-end-column="1" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/@wso2-dashboards/widget/lib/Widget.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="190">
+          <caret line="60" column="23" selection-start-line="60" selection-start-column="14" selection-end-line="60" selection-end-column="23" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/utils/WidgetChannelManager.js" />
+    <entry file="file://$APPLICATION_HOME_DIR$/plugins/JavaScriptLanguage/jsLanguageServicesImpl/external/lib.dom.d.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state>
+          <caret line="14753" column="25" lean-forward="true" selection-start-line="14753" selection-start-column="25" selection-end-line="14753" selection-end-column="25" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/@wso2-dashboards/widget/lib/WidgetChannelManager.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-199">
+          <caret line="32" column="8" selection-start-line="32" selection-start-column="8" selection-end-line="32" selection-end-column="8" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$APPLICATION_CONFIG_DIR$/scratches/scratch.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="95">
+          <caret line="5" column="37" selection-start-line="5" selection-start-column="37" selection-end-line="5" selection-end-column="37" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/react/index.js">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/react/package.json">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/node_modules/@types/react/index.d.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="10184">
+          <caret line="557" column="13" selection-start-line="557" selection-start-column="13" selection-end-line="557" selection-end-column="13" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/package-lock.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1140">
+          <caret line="60" column="28" selection-start-line="60" selection-start-column="27" selection-end-line="60" selection-end-column="28" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/README.md">
+      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
+        <state split_layout="SPLIT">
+          <first_editor />
+          <second_editor />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/webpack.config.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1121">
+          <caret line="59" column="12" selection-start-line="59" selection-start-column="12" selection-end-line="59" selection-end-column="12" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/resources/messageFlowStreamEventDataProviderConf.json" />
+    <entry file="file://$PROJECT_DIR$/src/resources/aggregatorDataProviderConf.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="209">
+          <caret line="11" column="1" selection-start-line="11" selection-start-column="1" selection-end-line="11" selection-end-column="1" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/package.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="304">
+          <caret line="16" column="6" selection-start-line="16" selection-start-column="6" selection-end-line="16" selection-end-column="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$APPLICATION_CONFIG_DIR$/scratches/scratch_2.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state>
+          <caret column="1" selection-end-column="169" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/resources/configEntryDataProviderConf.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state>
+          <caret column="1" lean-forward="true" selection-start-column="1" selection-end-column="1" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/resources/widgetConf.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state>
+          <caret lean-forward="true" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/MessageFlow.jsx">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2966">
+          <caret line="449" column="60" selection-start-line="449" selection-start-column="60" selection-end-line="449" selection-end-column="60" />
+          <folding>
+            <element signature="e#0#26#0" expanded="true" />
+            <element signature="n#!!block;n#constructor#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#handleResize#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#drawMessageFlow#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getConfigEntryDataProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getAggregateDataProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#drawMessageFlowGraph#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getEntryPointSchema#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getSequenceSchema#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#combineAndDrawMessageFlow#0;n#MessageFlow#0" />
+            <element signature="e#26283#32951#0" />
+            <element signature="e#33059#33356#0" />
+            <element signature="e#33411#33553#0" />
+            <element signature="n#!!block;n#parseDatastoreMessage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getProviderConf#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#detectIE#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#buildLabel#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#interpolateZoom#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#isParent#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getEmptyRecordsText#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#componentWillMount#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#componentDidMount#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#handleMessage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#noParameters#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getCurrentPage#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#render#0;n#MessageFlow#0" />
+            <element signature="n#!!block;n#getDashboardBaseUrl#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+  </component>
+</project>
