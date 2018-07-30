@@ -4,19 +4,18 @@ import $ from 'jquery';
 import dagreD3 from 'dagre-d3';
 import * as d3 from 'd3';
 import './custom.css';
-import aggregatorDataProviderConf from './resources/aggregatorDataProviderConf.json';
-import configEntryDataProviderConf from './resources/configEntryDataProviderConf.json';
 import moment from 'moment';
 import nanoScrollerSelector from 'nanoscroller';
 
-var TYPE_MEDIATOR = 'mediator';
-var TYPE_SEQUENCE = 'sequences';
-var TYPE_ENDPOINT = 'endpoint';
-var DASHBOARD_NAME = 'eianalytics';
-var TYPE_PROXY = "proxy";
-var TYPE_API = "api";
-var TYPE_INBOUND_ENDPOINT = "inbound";
-var TYPE_MESSAGE = "message";
+const TYPE_MEDIATOR = 'mediator';
+const TYPE_SEQUENCE = 'sequence';
+const TYPE_ENDPOINT = 'endpoint';
+const DASHBOARD_NAME = 'eianalytics';
+const TYPE_PROXY = "proxy";
+const TYPE_API = "api";
+const TYPE_INBOUND_ENDPOINT = "inbound";
+const TYPE_MESSAGE = "message";
+const DEFAULT_META_TENANT_ID = '-1234';
 
 var BASE_URL = getDashboardBaseUrl();
 
@@ -221,7 +220,7 @@ class MessageFlow extends Widget {
      * Extract most recent entry point message flow data array for a given component from the database for
      * proxy, api and inbound endpoint message flows
      *
-     * @param timeFrom Time duration start position
+     * @param timeFrom Time duration start positions
      * @param timeTo Time duration end position
      * @param timeUnit Per which time unit, data should be retrieved(minutes, seconds etc)
      * @param entryName Name of the component
@@ -233,54 +232,49 @@ class MessageFlow extends Widget {
         this.setState({
             dataUnavailable: true
         });
-        this.callBackFunction = this.handleConfigEntryData(timeUnit, timeFrom, timeTo, tenantId, entryName).bind(this);
-        let query = this.getConfigEntryDataProviderConf(entryName, tenantId, timeFrom, timeTo);
-        console.log(JSON.stringify(query));
-        super.getWidgetChannelManager().subscribeWidget(
-            this.props.id,
-            this.callBackFunction,
-            query
-        );
-    }
-
-    getConfigEntryDataProviderConf(entryName, meta_tenantId, timeFrom, timeTo) {
-        let dataProviderConfigs = this.getProviderConf(configEntryDataProviderConf);
-        let query = dataProviderConfigs.configs.config.queryData.query;
-        query = query
-            .replace("{{entryName}}", entryName)
-            .replace("{{meta_tenantId}}", meta_tenantId)
-            .replace("{{timeFrom}}", timeFrom)
-            .replace("{{timeTo}}", timeTo)
-        console.warn(timeFrom, timeTo);
-        dataProviderConfigs.configs.config.queryData.query = query;
-        return dataProviderConfigs;
-    }
-
-    getAggregateDataProviderConf(timeUnit, timeFrom, timeTo, tenantId, hashcode) {
-        let dataProviderConfigs = this.getProviderConf(aggregatorDataProviderConf);
-        let query = dataProviderConfigs.configs.config.queryData.query;
-        query = query
-            .replace("{{timeUnit}}", timeUnit)
-            .replace("{{hashcode}}", '\'' + hashcode + '\'')
-            .replace("{{tenantId}}", tenantId)
-            .replace("{{timeTo}}", timeTo)
-            .replace("{{timeFrom}}", timeFrom)
-        console.warn(query);
-        dataProviderConfigs.configs.config.queryData.query = query;
-        return dataProviderConfigs;
+        let callBackFunction = this.handleConfigEntryData(timeUnit, timeFrom, timeTo, tenantId, entryName).bind(this);
+        super.getWidgetConfiguration(this.props.widgetID)
+            .then((message) => {
+                let dataProviderConf = message.data;
+                let query = dataProviderConf.configs.providerConfig.configs.config.queryData
+                    .GET_CONFIG_ENTRY_DATA;
+                let formattedQuery = query
+                    .replace("{{entryName}}", entryName)
+                    .replace("{{meta_tenantId}}", tenantId)
+                    .replace("{{timeFrom}}", timeFrom)
+                    .replace("{{timeTo}}", timeTo);
+                dataProviderConf.configs.providerConfig.configs.config.queryData = {query: formattedQuery};
+                super.getWidgetChannelManager().subscribeWidget(
+                    this.props.id,
+                    callBackFunction,
+                    dataProviderConf.configs.providerConfig
+                );
+            });
     }
 
     handleConfigEntryData(timeUnit, timeFrom, timeTo, tenantId, entryName) {
-        return function (configEntryData) {
+        return (configEntryData) => {
             if (configEntryData) {
                 let hashcodeIndex = configEntryData.metadata.names.indexOf("hashcode");
 
                 let hashcodeData = configEntryData.data[0][hashcodeIndex];
-                this.getWidgetChannelManager().subscribeWidget(
-                    this.props.id,
-                    this.handleAggregateData(configEntryData, entryName).bind(this),
-                    this.getAggregateDataProviderConf(timeUnit, timeFrom, timeTo, tenantId, hashcodeData)
-                );
+                super.getWidgetConfiguration(this.props.widgetID)
+                    .then((message) => {
+                        let dataProviderConf = message.data;
+                        let formattedQuery = dataProviderConf.configs.providerConfig.configs.config.queryData
+                            .ENTRY_POINT_MESSAGE_FLOW_GET_AGGREGATE_DATA
+                            .replace("{{timeUnit}}", timeUnit)
+                            .replace("{{hashcode}}", '\'' + hashcodeData + '\'')
+                            .replace("{{tenantId}}", tenantId)
+                            .replace("{{timeTo}}", timeTo)
+                            .replace("{{timeFrom}}", timeFrom);
+                        dataProviderConf.configs.providerConfig.configs.config.queryData = {query: formattedQuery};
+                        super.getWidgetChannelManager().subscribeWidget(
+                            this.props.id,
+                            this.handleAggregateData(configEntryData, entryName).bind(this),
+                            dataProviderConf.configs.providerConfig
+                        );
+                    });
             } else {
                 // todo: Handle missing configEntry data
             }
@@ -470,12 +464,12 @@ class MessageFlow extends Widget {
         super.getWidgetConfiguration(this.props.widgetID)
             .then((message) => {
                 let dataProviderConf = message.data;
-                var query = dataProviderConf.configs.providerConfig.configs.config.queryData
+                let query = dataProviderConf.configs.providerConfig.configs.config.queryData
                     .MESSAGE_FLOW_QUERY_GET_COMPONENTS;
                 let formattedQuery = query
                     .replace("{{messageFlowId}}", "\'" + messageFlowID + "\'")
                     .replace("{{meta_tenantId}}", tenantId);
-                dataProviderConf.configs.providerConfig.configs.config.queryData.query = formattedQuery;
+                dataProviderConf.configs.providerConfig.configs.config.queryData = {query: formattedQuery};
                 super.getWidgetChannelManager()
                     .subscribeWidget(
                         this.props.id,
@@ -507,11 +501,12 @@ class MessageFlow extends Widget {
                         .replace("{{hashcode}}", "\'" + entryPointHashCode + "\'")
                         .replace("{{meta_tenantId}}", tenantId);
                     dataProviderConf.configs.providerConfig.configs.config.queryData.query = formattedQuery;
+                    let formattedProviderConfig = dataProviderConf.configs.providerConfig;
                     super.getWidgetChannelManager()
                         .subscribeWidget(
                             this.props.id,
                             this.handleMessageFlowSchema(parsedComponents, entryPoint, tenantId).bind(this),
-                            dataProviderConf.configs.providerConfig
+                            formattedProviderConfig
                         );
                 })
                 .catch((error) => {
@@ -529,14 +524,13 @@ class MessageFlow extends Widget {
             let sequenceComponentsQuery = "("; // Query for Components which are sequences
             parsedComponents.forEach((value) => {
                 if (value.componentType === "Sequence") {
-                    // sequenceComponentsQuery += ("hashcode=='" + value.hashCode + "' OR "); // todo: Uncomment this
+                    sequenceComponentsQuery += ("hashcode=='" + value.hashCode + "' OR ");
                 }
             })
 
             // If sequences exists
             if (sequenceComponentsQuery.length > 0) { // todo: Test this scenario with sequence components
-                //sequenceComponentsQuery += "false) "; // To fix final 'OR' in the query
-                sequenceComponentsQuery += "true)"; // todo: Uncomment this
+                sequenceComponentsQuery += "false) "; // To fix final 'OR' in the query
 
                 super.getWidgetConfiguration(this.props.widgetID)
                     .then((message) => {
@@ -557,8 +551,18 @@ class MessageFlow extends Widget {
                     .catch((error) => {
                         // todo: Handle failure
                     });
+                /*
+                DB call for data might not return anything. But still the graph is drawn for empty data scenario.
+                If any data retrieved from the DB, graph will be redrawn accordingly in the callback function
+                 */
+                this.handleMessageFlowComponentSchemas(
+                    parsedComponents,
+                    entryPoint,
+                    parsedFlowScheme
+                )("");
             }
             else {
+                // If there are no sequences present, no need to make a DB call
                 this.handleMessageFlowComponentSchemas(parsedComponents, entryPoint, parsedFlowScheme)("");
             }
         }
@@ -575,10 +579,13 @@ class MessageFlow extends Widget {
      */
     handleMessageFlowComponentSchemas(parsedComponents, entryPoint, flowScheme) {
         return (sequenceComponents) => {
+            this.setState({
+                dataUnavailable: false
+            });
             let parsedFlowScheme = JSON.parse(flowScheme[0].configData);
             let componentMap = {};
             let parsedSequenceComponents = [];
-            if (sequenceComponents !== ""){
+            if (sequenceComponents !== "") {
                 parsedSequenceComponents = this.parseDatastoreMessage(sequenceComponents);
             }
 
@@ -588,7 +595,7 @@ class MessageFlow extends Widget {
                     for (let sequence of parsedSequenceComponents) {
                         if (sequence.hashcode === component.hashCode) {
                             // For each element in the sequence scheme, push it to the parsed flow scheme
-                            value.configData.forEach((eachScheme) => {
+                            sequence.configData.forEach((eachScheme) => {
                                 parsedFlowScheme.push(eachScheme);
                             })
                             break;
@@ -628,7 +635,7 @@ class MessageFlow extends Widget {
                                 if (componentIdTmp == componentId) {
                                     schema[j]["id"] = originalCompId;
                                 }
-                                if (componentIdParentTmp == componentId){
+                                if (componentIdParentTmp == componentId) {
                                     schema[j]["parentId"] = originalCompId;
                                 }
                                 if (tempGroupId == componentId) {
@@ -638,7 +645,7 @@ class MessageFlow extends Widget {
                         }
                     }
 
-                    var componentInfo  = null;
+                    var componentInfo = null;
                     if (componentId != null) {
                         componentInfo = componentMap[componentId];
                     }
@@ -753,6 +760,229 @@ class MessageFlow extends Widget {
     }
 
     /**
+     * Get most recent config data for a given entryName and pass it to the relevant data handler
+     *
+     * @param timeFrom Time duration start position
+     * @param timeTo Time duration end position
+     * @param timeUnit Per which time unit, data should be retrieved(minutes, seconds etc)
+     * @param entryName Name of the component
+     * @param pageType Page name required for the message flow drawing
+     */
+    drawSequenceMessageFlowGraph(timeFrom, timeTo, timeUnit, entryName, tenantId) {
+
+        // Extract latest configEntry data row from the datastore
+        this.setState({
+            dataUnavailable: true
+        });
+        let handleConfigData = this.handleSequenceMessageFlowSchema(timeUnit, timeFrom, timeTo, tenantId, entryName).bind(this);
+        super.getWidgetConfiguration(this.props.widgetID)
+            .then((message) => {
+                let dataProviderConf = message.data;
+                let query = dataProviderConf.configs.providerConfig.configs.config.queryData
+                    .GET_CONFIG_ENTRY_DATA;
+                let formattedQuery = query
+                    .replace("{{entryName}}", entryName)
+                    .replace("{{meta_tenantId}}", tenantId)
+                    .replace("{{timeFrom}}", timeFrom)
+                    .replace("{{timeTo}}", timeTo);
+                dataProviderConf.configs.providerConfig.configs.config.queryData = {query: formattedQuery};
+                super.getWidgetChannelManager().subscribeWidget(
+                    this.props.id,
+                    handleConfigData,
+                    dataProviderConf.configs.providerConfig
+                );
+            });
+    }
+
+    handleSequenceMessageFlowSchema(timeUnit, timeFrom, timeTo, tenantId, entryName) {
+        return (schemaData) => {
+            if (schemaData) {
+                let parsedSchemaData = this.parseDatastoreMessage(schemaData)[0]; // Get latest schema data
+
+                let artifactFirstEntryTime = moment(parsedSchemaData._timestamp).format("YYYY-MM-DD HH:mm:ss");
+                let schema = JSON.parse(parsedSchemaData.configData);
+                let componentIdQuery = "(";
+
+                for (let j = 0; j < schema.length; j++) {
+                    if (schema[j] != null) {
+                        let componentId = schema[j]["id"];
+                        let isIndirectComponent = componentId.indexOf("@indirect");
+                        if (isIndirectComponent > 0) {
+                            // PaymentServiceEp@14:PaymentServiceEp@indirect --> PaymentServiceEp@0:PaymentServiceEp
+                            let splitByAt = componentId.split("@"); // ["PaymentServiceEp", "14:PaymentServiceEp", "indirect"]
+                            let splitByColon = splitByAt[1].split(":"); // ["14", "PaymentServiceEp"]
+                            componentId = splitByAt[0] + "@0:" + splitByColon[1];
+                        }
+                        componentIdQuery += "componentId=='" + componentId + "' OR ";
+                    }
+                }
+                componentIdQuery += "false) "; // Fix final 'AND' in the query
+                // get components info from different tables
+                let dataFetchTime = artifactFirstEntryTime;
+                if (moment(timeFrom.replace(/'/g, '')).isBefore(artifactFirstEntryTime)) {
+                    dataFetchTime = timeFrom;
+                }
+                else {
+                    dataFetchTime = "\'" + artifactFirstEntryTime + "\'";
+                }
+
+                super.getWidgetConfiguration(this.props.widgetID)
+                    .then((message) => {
+                        let dataProviderConf = message.data;
+                        let query = dataProviderConf.configs.providerConfig.configs.config.queryData
+                            .SEQUENCE_MESSAGE_FLOW_QUERY_GET_AGGREGATE_DATA;
+                        let formattedQuery = query
+                            .replace("{{componentIDs}}", componentIdQuery)
+                            .replace("{{timeUnit}}", timeUnit)
+                            .replace("{{tenantId}}", tenantId)
+                            .replace("{{timeTo}}", timeTo)
+                            .replace("{{timeFrom}}", dataFetchTime);
+                        dataProviderConf.configs.providerConfig.configs.config.queryData = {query: formattedQuery};
+
+                        super.getWidgetChannelManager().subscribeWidget(
+                            this.props.id,
+                            this.handleSequenceMessageFlowAggregateData(schema).bind(this),
+                            dataProviderConf.configs.providerConfig
+                        );
+                    })
+                    .catch((error) => {
+                        // todo: Handle failure
+                    });
+            } else {
+                // todo: Handle missing configEntry data
+            }
+        }
+    }
+
+    /**
+     * Combine aggregate data and generate message flow data array. Then call graph draw function
+     *
+     * @returns {Function}
+     */
+    handleSequenceMessageFlowAggregateData(schema) {
+        return (aggregatedData) => {
+            this.setState({
+                dataUnavailable: false
+            });
+            let parsedAggregateData = this.parseDatastoreMessage(aggregatedData);
+            let componentMap = {};
+            parsedAggregateData.forEach((eachComponent) => {
+                componentMap[eachComponent.componentId] = eachComponent;
+            });
+            let fields = ["invocations", "totalDuration", "maxDuration", "faults"];
+            let result = [];
+            // Populate tabel data
+            let componentNameRegex = new RegExp("^.*@\\d*:(.*)");
+            let groups = [];
+            for (let i = 0; i < schema.length; i++) {
+                let groupLabel;
+                let groupId = schema[i]["group"];
+                let componentId = schema[i]["id"];
+
+                let isIndirectComponent = componentId.indexOf("@indirect");
+                let originalCompId = componentId;
+                if (isIndirectComponent > 0) {
+                    // PaymentServiceEp@14:PaymentServiceEp@indirect --> PaymentServiceEp@0:PaymentServiceEp
+                    var splitByAt = componentId.split("@"); // ["PaymentServiceEp", "14:PaymentServiceEp", "indirect"]
+                    var splitByColon = splitByAt[1].split(":"); // ["14", "PaymentServiceEp"]
+                    componentId = splitByAt[0] + "@0:" + splitByColon[1];
+                    for (var j = 0; j < schema.length; j++) {
+                        if (schema[j] != null) {
+                            var componentIdTmp = schema[j]["id"];
+                            var componentIdParentTmp = schema[j]["parentId"];
+                            var tempGroupId = schema[j]["group"];
+                            if (componentIdTmp == componentId) {
+                                schema[j]["id"] = originalCompId;
+                            } else if (componentIdParentTmp == componentId) {
+                                schema[j]["parentId"] = originalCompId;
+                            }
+                            if (tempGroupId == componentId) {
+                                schema[j]["group"] = originalCompId;
+                            }
+                        }
+                    }
+                }
+
+                var componentInfo = componentMap[componentId];
+                var dataAttributes = [];
+
+                // Find unique groups
+                if (schema[i]["group"] != null && groups.indexOf(schema[i]["group"]) == -1) {
+                    groups.push(schema[i]["group"]);
+                }
+
+                // Create data attributes
+                for (let field in fields) {
+                    var fieldName = fields[field];
+                    if (componentInfo != null) {
+                        if (fieldName == "TotalDuration") {
+                            dataAttributes.push({
+                                "name": "AvgDuration",
+                                "value": (componentInfo[fieldName] / componentInfo["Invocations"]).toFixed(2)
+                            });
+                        } else {
+                            dataAttributes.push({"name": fieldName, "value": componentInfo[fieldName]});
+                        }
+                    } else {
+                        dataAttributes.push({"name": fieldName, "value": 0});
+                    }
+                }
+
+                var componentLabel = componentNameRegex.exec(componentId)[1];
+                let componentType;
+                if (componentInfo != null) {
+                    componentType = componentInfo["componentType"];
+                } else {
+                    componentType = "UNKNOWN";
+                }
+
+                // Create hidden attributes
+                var hiddenAttributes = [];
+                if (componentInfo != null) {
+                    hiddenAttributes.push({"name": "entryPoint", "value": componentInfo["entryPoint"]});
+                }
+                if (componentType == "Endpoint" || componentType == "Sequence") {
+                    hiddenAttributes.push({"name": "id", "value": componentLabel});
+                } else {
+                    hiddenAttributes.push({"name": "id", "value": componentId});
+                }
+
+                if (schema[i]["parentId"] == schema[i]["group"]) {
+                    result.push({
+                        "id": originalCompId,
+                        "label": componentLabel,
+                        "parents": [],
+                        "group": schema[i]["group"],
+                        "type": componentType,
+                        "dataAttributes": dataAttributes,
+                        "hiddenAttributes": hiddenAttributes,
+                        "modifiedId": componentId
+                    });
+                } else {
+                    result.push({
+                        "id": originalCompId,
+                        "label": componentLabel,
+                        "parents": [schema[i]["parentId"]],
+                        "group": schema[i]["group"],
+                        "type": componentType,
+                        "dataAttributes": dataAttributes,
+                        "hiddenAttributes": hiddenAttributes,
+                        "modifiedId": componentId
+                    });
+                }
+            }
+            // Defining groups
+            for (var j = 0; j < result.length; j++) {
+                if (groups.indexOf(result[j]["id"]) >= 0) {
+                    result[j]["type"] = "group";
+                }
+            }
+
+            this.drawMessageFlow($, result);
+        }
+    }
+
+    /**
      * Parse received data from the data store to a JS object
      */
     parseDatastoreMessage(recievedData) {
@@ -774,11 +1004,6 @@ class MessageFlow extends Widget {
         })
 
         return parsedArray;
-    }
-
-    getProviderConf(aggregatorDataProviderConf) {
-        let stringifiedDataProvideConf = JSON.stringify(aggregatorDataProviderConf);
-        return JSON.parse(stringifiedDataProvideConf);
     }
 
     detectIE() {
@@ -899,11 +1124,17 @@ class MessageFlow extends Widget {
     }
 
     componentDidMount() {
-        this.drawMessageFlowGraph("urn_uuid_b4d2bd01-b44c-44c2-83ec-d3ada2c103dc57090651967469", "-1234");
+        // Draw message flow in the message page with component load
+        if (this.getCurrentPage() === TYPE_MESSAGE) {
+            let entry = getQueryString();
+            this.drawMessageFlowGraph(
+                entry.id,
+                DEFAULT_META_TENANT_ID
+            );
+        }
     }
 
     handleMessage(recievedMessage) {
-        console.log(JSON.stringify(message));
         let message;
         if (typeof recievedMessage == "string") {
             message = JSON.parse(recievedMessage);
@@ -929,19 +1160,34 @@ class MessageFlow extends Widget {
             && this.parameters.timeUnit != null
             && this.parameters.selectedComponantID != null) {
 
-            this.drawEntryPointMessageFlowGraph(
-                this.parameters.timeFrom,
-                this.parameters.timeTo,
-                this.parameters.timeUnit,
-                this.parameters.selectedComponantID,
-                this.parameters.meta_tenantId
-            );
+            switch (this.getCurrentPage()) {
+                case TYPE_API:
+                case TYPE_PROXY:
+                case TYPE_INBOUND_ENDPOINT:
+                    this.drawEntryPointMessageFlowGraph(
+                        this.parameters.timeFrom,
+                        this.parameters.timeTo,
+                        this.parameters.timeUnit,
+                        this.parameters.selectedComponantID,
+                        this.parameters.meta_tenantId
+                    );
+                    break;
+                case TYPE_SEQUENCE:
+                    this.drawSequenceMessageFlowGraph(
+                        this.parameters.timeFrom,
+                        this.parameters.timeTo,
+                        this.parameters.timeUnit,
+                        this.parameters.selectedComponantID,
+                        this.parameters.meta_tenantId
+                    )
+                    break;
+            }
         }
     }
 
     noParameters() {
-        var page = this.getCurrentPage();
-        let pageName = page == null ? '' : page.name;
+        let page = this.getCurrentPage();
+        let pageName = (page == null) ? '' : page;
         switch (pageName) {
             case 'api':
                 return 'Please select an API and a valid date range to view stats.';
@@ -949,7 +1195,7 @@ class MessageFlow extends Widget {
             case 'proxy':
                 return 'Please select a Proxy Service and a valid date range to view stats.';
                 break;
-            case 'sequences':
+            case 'sequence':
                 return 'Please select a Sequence and a valid date range to view stats.';
                 break;
             case 'endpoint':
@@ -997,14 +1243,16 @@ class MessageFlow extends Widget {
                             </button>
                         </div>
                         <div id="canvas" ref={input => (this.domElementCanvas = input)}>
-                            {this.state.dataUnavailable === true ?
-                                <div class="status-message">
-                                    <div class="message message-info">
-                                        <h4 style={centerDiv}>
-                                            <i class="icon fw fw-info"></i> No records found</h4>
-                                        <p style={centerDiv}>{this.noParameters()}</p>
-                                    </div>
-                                </div> : null}
+                            {
+                                this.state.dataUnavailable === true ?
+                                    (<div class="status-message">
+                                        <div class="message message-info">
+                                            <h4 style={centerDiv}>
+                                                <i class="icon fw fw-info"></i> No records found</h4>
+                                            <p style={centerDiv}>{this.noParameters()}</p>
+                                        </div>
+                                    </div>) : null
+                            }
                         </div>
                         <svg id="svg-canvas" width="100%" height="100%"
                              ref={input => (this.domElementSvg = input)}></svg>
@@ -1023,4 +1271,17 @@ function getDashboardBaseUrl() {
     return "/" + tenantBaseUrl + "/" + DASHBOARD_NAME + "/";
 }
 
+function getQueryString() {
+    var queryStringKeyValue = window.location.search.replace('?', '').split('&');
+    var qsJsonObject = {};
+    if (queryStringKeyValue != '') {
+        for (let i = 0; i < queryStringKeyValue.length; i++) {
+            qsJsonObject[queryStringKeyValue[i].split('=')[0]] = queryStringKeyValue[i].split('=')[1];
+        }
+    }
+    return qsJsonObject;
+};
+
 global.dashboard.registerWidget('MessageFlow', MessageFlow);
+
+//todo: Test Sequence message flow with :-> Sequence components added message flow scenario
