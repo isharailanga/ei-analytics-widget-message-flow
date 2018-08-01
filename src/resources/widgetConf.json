@@ -6,7 +6,8 @@
   "configs": {
     "pubsub": {
       "types": [
-        "subscriber"
+        "subscriber",
+        "publisher"
       ]
     },
     "providerConfig": {

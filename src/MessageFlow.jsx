@@ -49,6 +49,23 @@ class MessageFlow extends Widget {
         };
 
         this.props.glContainer.on('resize', this.handleResize.bind(this));
+        this.handleOnClick = (e) => {
+            e.stopPropagation();
+            $(".nodeLabel").removeClass('selected');
+            $(this).addClass('selected')
+            e.preventDefault();
+            if (e.currentTarget.getAttribute("data-node-type") === "UNKNOWN") {
+                return;
+            }
+            if (this.getCurrentPage() !== TYPE_MESSAGE) {
+                window.open(e.currentTarget.getAttribute("data-target-url"));
+            } else {
+                //let componentId = $(this).data("componentId");
+                super.publish({
+                    componentId: e.currentTarget.getAttribute("data-component-id")
+                });
+            }
+        };
     }
 
     handleResize() {
@@ -214,6 +231,8 @@ class MessageFlow extends Widget {
             zoom.scale(zoomScale);
             zoom.event(svg);
         });
+
+        $("body").on("click", ".nodeLabel", this.handleOnClick);
     }
 
     /**
@@ -1033,14 +1052,14 @@ class MessageFlow extends Widget {
     }
 
     buildLabel(node, $) {
-        var pageUrl = MEDIATOR_PAGE_URL;
+        let pageUrl = MEDIATOR_PAGE_URL;
         if (node.type === "Sequence") {
             pageUrl = SEQUENCE_PAGE_URL;
         } else if (node.type === "Endpoint") {
             pageUrl = ENDPOINT_PAGE_URL;
         }
-        var hashCode = "";
-        var hiddenParams = '';
+        let hashCode = "";
+        let hiddenParams = '';
         if (node.hiddenAttributes) {
             node.hiddenAttributes.forEach(function (item, i) {
                 hiddenParams += '&' + item.name + '=' + item.value;
@@ -1050,7 +1069,6 @@ class MessageFlow extends Widget {
             });
         }
         var targetUrl = pageUrl + '?' + hiddenParams;
-        // console.log("Test : " + targetUrl);
         var labelText;
 
         if (node.dataAttributes) {
@@ -1077,8 +1095,7 @@ class MessageFlow extends Widget {
                 icon = '';
             }
 
-            // todo: Add functionality to the target URL(When a node is clicked, add necessary functionality)
-            labelText = '<a href="#" class="' + nodeWrapClasses + '">' + icon + '<div class="' + nodeClasses + '" data-node-type="' + node.type + '" data-component-id="' + node.modifiedId
+            labelText = '<a href="#" class="' + nodeWrapClasses +'">'+ icon +'<div class="' + nodeClasses +'" data-node-type="' + node.type + '" data-component-id="' + node.modifiedId
                 + '" data-hash-code="' + hashCode + '" data-target-url="' + targetUrl + '"><h4>' + node.label + "</h4>";
 
             node.dataAttributes.forEach(function (item, i) {
@@ -1284,4 +1301,5 @@ function getQueryString() {
 
 global.dashboard.registerWidget('MessageFlow', MessageFlow);
 
-//todo: Test Sequence message flow with :-> Sequence components added message flow scenario
+// todo: Test Sequence message flow with :-> Sequence components added message flow scenario
+// todo: Add entryPoint support for all line graphs
